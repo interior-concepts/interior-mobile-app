@@ -1,0 +1,31 @@
+name: new_project
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  rive: ^0.14.5
+  http: ^1.6.0
+  clerk_flutter: ^0.0.8-beta
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/checkbackground.jpg
+    - assets/images/aesthetic-icon.png
+    - assets/images/favicon-16x16.png
+    - assets/images/favicon-32x32.png
+
+# No dependency_overrides required — use compatible rive package

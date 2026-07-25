@@ -1,8 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
-
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.VIBRATE" />
     <application
-        android:label="new_project"
+        android:label="Aesthetic Interior"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

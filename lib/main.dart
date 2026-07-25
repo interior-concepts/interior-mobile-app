@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:clerk_flutter/clerk_flutter.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:firebase_core/firebase_core.dart';
 
-import 'screens/visit_team/visit_team_home_screen.dart';
+import 'screens/root_screen.dart';
 import 'screens/clerk_auth_screen.dart';
 import 'theme/crm_theme.dart';
+import 'services/fcm_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase (required for FCM).
+  await Firebase.initializeApp();
+
+  // Initialize FCM and register background handler.
+  await FcmService.initialize();
+
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -31,7 +41,10 @@ class CrmMobileApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClerkAuth(
-      config: ClerkAuthConfig(publishableKey: _clerkPublishableKey),
+      config: ClerkAuthConfig(
+        publishableKey: _clerkPublishableKey,
+        loading: const _AuthBootSplash(),
+      ),
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Aesthetic OMS',
@@ -48,15 +61,34 @@ class CrmMobileApp extends StatelessWidget {
             child: child ?? const SizedBox.shrink(),
           );
         },
-        home: ClerkErrorListener(
-          child: ClerkAuthBuilder(
-            signedInBuilder: (context, authState) =>
-                const VisitTeamHomeScreen(),
-            signedOutBuilder: (context, authState) =>
-                const ClerkAuthenticationScreen(),
+        home: ClerkAuthBuilder(
+          signedInBuilder: (context, authState) => const RootScreen(),
+          signedOutBuilder: (context, authState) => const ClerkAuthenticationScreen(),
+        ),
+      ),
+    );
+  }
+}
+
+class _AuthBootSplash extends StatelessWidget {
+  const _AuthBootSplash();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Directionality(
+      textDirection: TextDirection.ltr,
+      child: Material(
+        color: Colors.white,
+        child: SafeArea(
+          child: Center(
+            child: SpinKitFoldingCube(
+              color: Colors.blue,
+              size: 50.0,
+            ),
           ),
         ),
       ),
     );
   }
 }
+

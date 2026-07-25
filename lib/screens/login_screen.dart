@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 
 import '../theme/crm_colors.dart';
 import '../theme/crm_theme.dart';
@@ -184,9 +185,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ? const SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.2,
+                      child: SpinKitFoldingCube(
                         color: Colors.white,
+                        size: 20.0,
                       ),
                     )
                   : const Text('Sign In'),

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "853954052918",
+    "project_id": "aesthetic-interior",
+    "storage_bucket": "aesthetic-interior.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:853954052918:android:5eef03bd5060a100d82997",
+        "android_client_info": {
+          "package_name": "com.example.new_project"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC_XTTXGSB8kbn_y_JbxLTYnQ8Pkx_KkIU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

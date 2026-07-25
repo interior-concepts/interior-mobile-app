@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 import '../theme/crm_colors.dart';
 import 'user_button.dart';
+import '../services/notification_manager.dart';
+import 'notifications/notification_bottom_sheet.dart';
 
 class MobileAppHeader extends StatelessWidget implements PreferredSizeWidget {
   const MobileAppHeader({super.key, required this.title, this.onRefresh});
@@ -28,24 +30,16 @@ class MobileAppHeader extends StatelessWidget implements PreferredSizeWidget {
         statusBarBrightness: Brightness.light,
       ),
       centerTitle: true,
-      leadingWidth: 36,
+      leadingWidth: 56,
       leading: Padding(
-        padding: const EdgeInsets.only(left: 10),
+        padding: const EdgeInsets.only(left: 16),
         child: Center(
           child: Image.asset(
             'assets/images/favicon-16x16.png',
-            width: 16,
-            height: 16,
+            width: 32,
+            height: 32,
             fit: BoxFit.contain,
           ),
-        ),
-      ),
-      title: Text(
-        title,
-        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: CrmColors.foreground,
-          fontWeight: FontWeight.w600,
-          fontSize: 13,
         ),
       ),
       actions: [
@@ -55,10 +49,43 @@ class MobileAppHeader extends StatelessWidget implements PreferredSizeWidget {
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh',
           ),
-        IconButton(
-          onPressed: () {},
-          icon: const Icon(Icons.notifications_none_rounded),
-          tooltip: 'Notifications',
+        ListenableBuilder(
+          listenable: NotificationManager.instance,
+          builder: (context, _) {
+            final count = NotificationManager.instance.unreadCount;
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                IconButton(
+                  onPressed: () {
+                    NotificationBottomSheet.show(context);
+                  },
+                  icon: const Icon(Icons.notifications_none_rounded),
+                  tooltip: 'Notifications',
+                ),
+                if (count > 0)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: CrmColors.error,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        count > 99 ? '99+' : count.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          }
         ),
         const Padding(
           padding: EdgeInsets.only(right: 12),

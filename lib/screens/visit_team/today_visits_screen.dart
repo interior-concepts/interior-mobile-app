@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:clerk_flutter/clerk_flutter.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
 
 import '../../data/visits/visit.dart';
 import '../../data/visits/visit_api_service.dart';
@@ -85,7 +86,10 @@ class _TodayVisitsScreenState extends State<TodayVisitsScreen> {
               const Center(
                 child: Padding(
                   padding: EdgeInsets.only(top: 16),
-                  child: CircularProgressIndicator(),
+                  child: SpinKitFoldingCube(
+                    color: Colors.blue,
+                    size: 30.0,
+                  ),
                 ),
               )
             else if (_error != null)

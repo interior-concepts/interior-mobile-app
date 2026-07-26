@@ -2,22 +2,25 @@ import 'package:flutter/material.dart';
 import '../../widgets/mobile_app_header.dart';
 import '../../theme/crm_colors.dart';
 
-class SeniorCrmBudgetScreen extends StatelessWidget {
-  const SeniorCrmBudgetScreen({super.key});
+class SeniorCrmMeetingScreen extends StatelessWidget {
+  const SeniorCrmMeetingScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F8FC),
       appBar: MobileAppHeader(
-        title: 'Budget',
-        onRefresh: () async {},
+        title: 'Meeting',
+        onRefresh: () async {
+          await Future.delayed(const Duration(seconds: 1));
+        },
       ),
       body: const Center(
         child: Text(
-          'Budget Screen',
+          'Meeting Module\n(Coming Soon)',
+          textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: FontWeight.w600,
             color: CrmColors.mutedForeground,
           ),

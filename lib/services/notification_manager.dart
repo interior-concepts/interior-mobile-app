@@ -157,8 +157,8 @@ class NotificationManager extends ChangeNotifier {
     );
   }
 
-  Future<void> markAllAsRead() async {
-    if (_currentToken == null) return;
+  Future<bool> markAllAsRead() async {
+    if (_currentToken == null) return false;
     final success = await _apiService.markAllAsRead(_currentToken!);
     if (success) {
       _unreadCount = 0;
@@ -181,6 +181,7 @@ class NotificationManager extends ChangeNotifier {
       }
       notifyListeners();
     }
+    return success;
   }
 
   Future<void> markAsRead(String id) async {

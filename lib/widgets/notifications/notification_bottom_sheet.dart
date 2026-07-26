@@ -5,7 +5,7 @@ import '../../data/notifications/notification_item.dart';
 import '../../services/notification_manager.dart';
 import '../../theme/crm_colors.dart';
 
-class NotificationBottomSheet extends StatelessWidget {
+class NotificationBottomSheet extends StatefulWidget {
   const NotificationBottomSheet({super.key});
 
   static void show(BuildContext context) {
@@ -18,6 +18,31 @@ class NotificationBottomSheet extends StatelessWidget {
       ),
       builder: (ctx) => const NotificationBottomSheet(),
     );
+  }
+
+  @override
+  State<NotificationBottomSheet> createState() => _NotificationBottomSheetState();
+}
+
+class _NotificationBottomSheetState extends State<NotificationBottomSheet> {
+  bool _isMarkingAllRead = false;
+
+  Future<void> _handleMarkAllAsRead() async {
+    setState(() => _isMarkingAllRead = true);
+    try {
+      final success = await NotificationManager.instance.markAllAsRead();
+      if (!mounted) return;
+      if (!success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to mark all as read. Please try again.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isMarkingAllRead = false);
+    }
   }
 
   @override
@@ -64,18 +89,22 @@ class NotificationBottomSheet extends StatelessWidget {
                     final hasUnread = NotificationManager.instance.unreadCount > 0;
                     if (!hasUnread) return const SizedBox.shrink();
                     
-                    return TextButton(
-                      onPressed: () {
-                        NotificationManager.instance.markAllAsRead();
-                      },
-                      style: TextButton.styleFrom(
-                        foregroundColor: CrmColors.brandPrimary,
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(0, 0),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: const Text('Mark all as read'),
-                    );
+                    return _isMarkingAllRead
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : TextButton(
+                            onPressed: _handleMarkAllAsRead,
+                            style: TextButton.styleFrom(
+                              foregroundColor: CrmColors.brandPrimary,
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(0, 0),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text('Mark all as read'),
+                          );
                   },
                 ),
               ],
@@ -122,6 +151,7 @@ class NotificationBottomSheet extends StatelessWidget {
     );
   }
 }
+
 
 class _NotificationTile extends StatelessWidget {
   const _NotificationTile({required this.item});

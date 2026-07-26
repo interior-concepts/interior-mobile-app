@@ -1,6 +1,8 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:fui_kit/fui_kit.dart';
 
 import '../../data/user/user_api_service.dart';
 import '../../theme/crm_colors.dart';
@@ -71,6 +73,7 @@ class _VisitTeamHomeScreenState extends State<VisitTeamHomeScreen> {
     final safeIndex = _currentIndex.clamp(0, screens.length - 1);
 
     return Scaffold(
+      extendBody: true,
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
         transitionBuilder: (child, animation) {
@@ -87,77 +90,83 @@ class _VisitTeamHomeScreenState extends State<VisitTeamHomeScreen> {
         },
         child: screens[safeIndex],
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 24,
-              offset: const Offset(0, -4),
+      bottomNavigationBar: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.72),
+              border: Border(
+                top: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.4),
+                  width: 0.8,
+                ),
+              ),
             ),
-          ],
-        ),
-        child: NavigationBarTheme(
-          data: NavigationBarThemeData(
-            indicatorColor: CrmColors.brandPrimary.withValues(alpha: 0.15),
-            labelTextStyle: WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.selected)) {
+          child: NavigationBarTheme(
+            data: NavigationBarThemeData(
+              indicatorColor: CrmColors.brandPrimary.withValues(alpha: 0.15),
+              labelTextStyle: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: CrmColors.brandPrimary,
+                  );
+                }
                 return const TextStyle(
                   fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: CrmColors.brandPrimary,
+                  fontWeight: FontWeight.w500,
+                  color: CrmColors.mutedForeground,
                 );
-              }
-              return const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: CrmColors.mutedForeground,
-              );
-            }),
-            iconTheme: WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.selected)) {
-                return const IconThemeData(color: CrmColors.brandPrimary, size: 30);
-              }
-              return const IconThemeData(color: CrmColors.mutedForeground, size: 28);
-            }),
-          ),
-          child: NavigationBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            selectedIndex: safeIndex,
-            onDestinationSelected: (index) {
-              setState(() => _currentIndex = index);
-            },
+              }),
+              iconTheme: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) {
+                  return const IconThemeData(color: CrmColors.brandPrimary, size: 30);
+                }
+                return const IconThemeData(color: CrmColors.mutedForeground, size: 28);
+              }),
+            ),
+            child: NavigationBar(
+              backgroundColor: Colors.transparent,
+              surfaceTintColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              elevation: 0,
+              selectedIndex: safeIndex,
+              onDestinationSelected: (index) {
+                setState(() => _currentIndex = index);
+              },
             destinations: [
-              const NavigationDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard),
-                label: 'Dashboard',
+              NavigationDestination(
+                icon: FUI(RegularRounded.home, color: CrmColors.mutedForeground, width: 22, height: 22),
+                selectedIcon: FUI(SolidRounded.home, color: CrmColors.brandPrimary, width: 24, height: 24),
+                label: 'Home',
               ),
-              const NavigationDestination(
-                icon: Icon(Icons.assignment_outlined),
-                selectedIcon: Icon(Icons.assignment),
+              NavigationDestination(
+                icon: FUI(RegularRounded.listCheck, color: CrmColors.mutedForeground, width: 22, height: 22),
+                selectedIcon: FUI(SolidRounded.listCheck, color: CrmColors.brandPrimary, width: 24, height: 24),
                 label: 'Visits',
               ),
-              const NavigationDestination(
-                icon: Icon(Icons.calendar_month_outlined),
-                selectedIcon: Icon(Icons.calendar_month),
-                label: 'Today Visits',
+              NavigationDestination(
+                icon: FUI(RegularRounded.calendar, color: CrmColors.mutedForeground, width: 22, height: 22),
+                selectedIcon: FUI(SolidRounded.calendar, color: CrmColors.brandPrimary, width: 24, height: 24),
+                label: 'Today',
               ),
               if (_isLeader)
-                const NavigationDestination(
-                  icon: Icon(Icons.admin_panel_settings_outlined),
-                  selectedIcon: Icon(Icons.admin_panel_settings),
+                NavigationDestination(
+                  icon: FUI(RegularRounded.settings, color: CrmColors.mutedForeground, width: 22, height: 22),
+                  selectedIcon: FUI(SolidRounded.settings, color: CrmColors.brandPrimary, width: 24, height: 24),
                   label: 'Control',
                 )
               else
-                const NavigationDestination(
-                  icon: Icon(Icons.person_outline),
-                  selectedIcon: Icon(Icons.person),
+                NavigationDestination(
+                  icon: FUI(RegularRounded.user, color: CrmColors.mutedForeground, width: 22, height: 22),
+                  selectedIcon: FUI(SolidRounded.user, color: CrmColors.brandPrimary, width: 24, height: 24),
                   label: 'Profile',
                 ),
             ],
+          ),
+        ),
           ),
         ),
       ),

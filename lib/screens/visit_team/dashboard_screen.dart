@@ -252,6 +252,7 @@ class _VisitTeamDashboardScreenState extends State<VisitTeamDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F8FC),
+      extendBodyBehindAppBar: true,
       appBar: MobileAppHeader(title: 'Dashboard', onRefresh: _loadDashboardData),
       body: _loading
           ? const Center(
@@ -279,7 +280,7 @@ class _VisitTeamDashboardScreenState extends State<VisitTeamDashboardScreen> {
                   onRefresh: _loadDashboardData,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+                    padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + kToolbarHeight + 16, 16, 40),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -362,6 +363,7 @@ class _VisitTeamDashboardScreenState extends State<VisitTeamDashboardScreen> {
                         const SizedBox(height: 12),
 
                         GridView.count(
+                          padding: EdgeInsets.zero,
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
                           crossAxisCount: 2,

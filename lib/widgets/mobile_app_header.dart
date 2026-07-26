@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -24,6 +25,22 @@ class MobileAppHeader extends StatelessWidget implements PreferredSizeWidget {
       foregroundColor: foregroundColor,
       elevation: 0,
       scrolledUnderElevation: 0,
+      flexibleSpace: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.35),
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  width: 0.8,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
       systemOverlayStyle: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.dark,
@@ -35,7 +52,7 @@ class MobileAppHeader extends StatelessWidget implements PreferredSizeWidget {
         padding: const EdgeInsets.only(left: 16),
         child: Center(
           child: Image.asset(
-            'assets/images/favicon-16x16.png',
+            'assets/icon.png',
             width: 32,
             height: 32,
             fit: BoxFit.contain,

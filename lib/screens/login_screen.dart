@@ -37,8 +37,45 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!mounted) return;
     setState(() => _isLoading = false);
+
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    // Mock Authentication Logic
+    // In a real app, the API would return specific error codes for wrong email vs wrong password
+    if (email != 'admin@company.com' || password != 'admin123') {
+      _showErrorAlert(
+        title: 'Authentication Failed',
+        message: 'You have entered an incorrect email or password.\n\nPlease double-check your credentials. Make sure you are using your assigned CRM email and that CAPS lock is off.',
+      );
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Login UI ready. API integration is next.')),
+      const SnackBar(content: Text('Login Successful! API integration is next.')),
+    );
+  }
+
+  void _showErrorAlert({required String title, required String message}) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.redAccent),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(fontSize: 18)),
+          ],
+        ),
+        content: Text(message, style: const TextStyle(height: 1.4)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Try Again'),
+          ),
+        ],
+      ),
     );
   }
 

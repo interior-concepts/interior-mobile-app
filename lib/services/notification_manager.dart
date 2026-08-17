@@ -15,6 +15,8 @@ class NotificationManager extends ChangeNotifier {
 
   Timer? _pollingTimer;
   String? _currentToken;
+  // Callback that returns a fresh Clerk JWT — needed because JWTs expire in ~60s
+  Future<String?> Function()? _tokenRefresher;
 
   List<NotificationItem> _items = [];
   int _unreadCount = 0;
@@ -57,8 +59,9 @@ class NotificationManager extends ChangeNotifier {
     _isInitialized = true;
   }
 
-  void startPolling(String token) {
+  void startPolling(String token, {Future<String?> Function()? tokenRefresher}) {
     _currentToken = token;
+    _tokenRefresher = tokenRefresher;
     _seenIds.clear();
     _isFirstFetch = true;
     _fetchNow();
@@ -72,6 +75,7 @@ class NotificationManager extends ChangeNotifier {
     _pollingTimer?.cancel();
     _pollingTimer = null;
     _currentToken = null;
+    _tokenRefresher = null;
     _items = [];
     _unreadCount = 0;
     _seenIds.clear();
@@ -79,14 +83,31 @@ class NotificationManager extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Returns a fresh token by calling the refresher, falling back to the stored token.
+  Future<String?> _getFreshToken() async {
+    if (_tokenRefresher != null) {
+      try {
+        final fresh = await _tokenRefresher!();
+        if (fresh != null && fresh.isNotEmpty) {
+          _currentToken = fresh;
+          return fresh;
+        }
+      } catch (_) {}
+    }
+    return _currentToken;
+  }
+
   void forceFetch() {
     _fetchNow();
   }
 
   Future<void> _fetchNow() async {
-    if (_currentToken == null) return;
+    if (_currentToken == null && _tokenRefresher == null) return;
 
-    final response = await _apiService.fetchNotifications(_currentToken!);
+    final token = await _getFreshToken();
+    if (token == null) return;
+
+    final response = await _apiService.fetchNotifications(token);
     if (response == null) return;
 
     _items = response.items;
@@ -158,8 +179,9 @@ class NotificationManager extends ChangeNotifier {
   }
 
   Future<bool> markAllAsRead() async {
-    if (_currentToken == null) return false;
-    final success = await _apiService.markAllAsRead(_currentToken!);
+    final token = await _getFreshToken();
+    if (token == null) return false;
+    final success = await _apiService.markAllAsRead(token);
     if (success) {
       _unreadCount = 0;
       for (var i = 0; i < _items.length; i++) {
@@ -185,8 +207,9 @@ class NotificationManager extends ChangeNotifier {
   }
 
   Future<void> markAsRead(String id) async {
-    if (_currentToken == null) return;
-    final success = await _apiService.markAsRead(_currentToken!, id);
+    final token = await _getFreshToken();
+    if (token == null) return;
+    final success = await _apiService.markAsRead(token, id);
     if (success) {
       final index = _items.indexWhere((i) => i.id == id);
       if (index != -1 && !_items[index].isRead) {

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:clerk_flutter/clerk_flutter.dart';
+import 'package:clerk_flutter/src/widgets/user/clerk_user_profile.dart';
 import '../../widgets/mobile_app_header.dart';
 import '../../theme/crm_colors.dart';
 
@@ -13,16 +15,7 @@ class SeniorCrmProfileScreen extends StatelessWidget {
         title: 'Profile',
         onRefresh: () async {},
       ),
-      body: const Center(
-        child: Text(
-          'Profile Screen',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: CrmColors.mutedForeground,
-          ),
-        ),
-      ),
+      body: const ClerkUserProfile(),
     );
   }
 }

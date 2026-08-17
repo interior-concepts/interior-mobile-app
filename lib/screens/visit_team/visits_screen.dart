@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_spinkit/flutter_spinkit.dart';
@@ -24,8 +25,9 @@ class _VisitsScreenState extends State<VisitsScreen> {
   List<Visit> _visits = const [];
   bool _loading = true;
   String? _errorMessage;
-  _VisitsFilter _activeFilter = _VisitsFilter.all;
   String _searchQuery = '';
+  _VisitsFilter _activeFilter = _VisitsFilter.all;
+  String? _currentUserId;
 
   @override
   void initState() {
@@ -43,6 +45,17 @@ class _VisitsScreenState extends State<VisitsScreen> {
 
     try {
       final token = await _getClerkJwt();
+      if (token != null) {
+        try {
+          final parts = token.split('.');
+          if (parts.length == 3) {
+            final payloadStr = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
+            final payload = jsonDecode(payloadStr);
+            _currentUserId = payload['sub'] as String?;
+          }
+        } catch (_) {}
+      }
+
       final items = await _visitApiService.fetchVisits(
         authTokenOverride: token,
       );
@@ -362,6 +375,7 @@ class _VisitsScreenState extends State<VisitsScreen> {
                 for (var i = 0; i < filteredVisits.length; i++) ...[
                   _VisitCard(
                     visit: filteredVisits[i],
+                    currentUserId: _currentUserId,
                     onTap: () => _showVisitActionMenu(filteredVisits[i]),
                     onLongPress: () => _showVisitActionMenu(filteredVisits[i]),
                   ),
@@ -377,6 +391,10 @@ class _VisitsScreenState extends State<VisitsScreen> {
 
 
   Future<void> _showVisitActionMenu(Visit visit) async {
+    final isSupportMember = _currentUserId != null &&
+        visit.supportAssignments.any((a) => a.supportUserId == _currentUserId) &&
+        visit.assignedToId != _currentUserId;
+
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -390,21 +408,23 @@ class _VisitsScreenState extends State<VisitsScreen> {
                 title: const Text('Complete'),
                 onTap: () => Navigator.of(ctx).pop('complete'),
               ),
-              ListTile(
-                leading: const Icon(Icons.person_add_alt_1_outlined),
-                title: const Text('Add Support Members'),
-                onTap: () => Navigator.of(ctx).pop('add_support'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.event_repeat_outlined),
-                title: const Text('Reschedule'),
-                onTap: () => Navigator.of(ctx).pop('reschedule'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.cancel_outlined),
-                title: const Text('Cancel'),
-                onTap: () => Navigator.of(ctx).pop('cancel'),
-              ),
+              if (!isSupportMember) ...[
+                ListTile(
+                  leading: const Icon(Icons.person_add_alt_1_outlined),
+                  title: const Text('Add Support Members'),
+                  onTap: () => Navigator.of(ctx).pop('add_support'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.event_repeat_outlined),
+                  title: const Text('Reschedule'),
+                  onTap: () => Navigator.of(ctx).pop('reschedule'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.cancel_outlined),
+                  title: const Text('Cancel'),
+                  onTap: () => Navigator.of(ctx).pop('cancel'),
+                ),
+              ],
             ],
           ),
         );
@@ -679,7 +699,7 @@ class _VisitsScreenState extends State<VisitsScreen> {
                         style: Theme.of(ctx).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 10),
-                      Text('Step ${step + 1} of 3'),
+                      if (!isSupport) Text('Step ${step + 1} of 3'),
                       const SizedBox(height: 8),
                       SegmentedButton<String>(
                         segments: const [
@@ -690,11 +710,12 @@ class _VisitsScreenState extends State<VisitsScreen> {
                         onSelectionChanged: (s) {
                           setModalState(() {
                             resultType = s.first;
+                            step = 0; // reset step on switch
                           });
                         },
                       ),
                       const SizedBox(height: 12),
-                      if (step == 0) ...[
+                      if (!isSupport && step == 0) ...[
                         TextField(
                           controller: summaryCtrl,
                           maxLines: 3,
@@ -737,7 +758,7 @@ class _VisitsScreenState extends State<VisitsScreen> {
                           ),
                         ),
                       ],
-                      if (step == 1) ...[
+                      if (!isSupport && step == 1) ...[
                         DropdownButtonFormField<String>(
                           initialValue: potentiality,
                           decoration: const InputDecoration(
@@ -830,9 +851,64 @@ class _VisitsScreenState extends State<VisitsScreen> {
                           onChanged: (v) => setModalState(() => stylePreference = v),
                         ),
                       ],
-                      if (step == 2) ...[
+                      if (isSupport) ...[
                         Text(
-                          'Add file on the attachments',
+                          'Support Fields',
+                          style: Theme.of(ctx).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: supportClientNameCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Support Client Name *',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: supportProjectAreaCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: const InputDecoration(
+                            labelText: 'Support Project Area (Sqft) *',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        DropdownButtonFormField<String>(
+                          initialValue: supportProjectStatus,
+                          decoration: const InputDecoration(
+                            labelText: 'Support Project Status *',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'UNDER_CONSTRUCTION',
+                              child: Text('UNDER_CONSTRUCTION'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'READY',
+                              child: Text('READY'),
+                            ),
+                          ],
+                          onChanged: (v) => setModalState(
+                            () => supportProjectStatus = v,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        TextField(
+                          controller: supportExtraConcernCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Support Extra Concern',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                      if ((!isSupport && step == 2) || isSupport) ...[
+                        Text(
+                          'Attachments',
                           style: Theme.of(ctx).textTheme.titleSmall,
                         ),
                         const SizedBox(height: 10),
@@ -867,93 +943,40 @@ class _VisitsScreenState extends State<VisitsScreen> {
                             ),
                           ),
                       ],
-                      if (isSupport) ...[
-                        const SizedBox(height: 14),
-                        Text(
-                          'Support Fields',
-                          style: Theme.of(ctx).textTheme.titleSmall,
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: supportClientNameCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Support Client Name *',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: supportProjectAreaCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: const InputDecoration(
-                            labelText: 'Support Project Area *',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        DropdownButtonFormField<String>(
-                          initialValue: supportProjectStatus,
-                          decoration: const InputDecoration(
-                            labelText: 'Support Project Status *',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'UNDER_CONSTRUCTION',
-                              child: Text('UNDER_CONSTRUCTION'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'READY',
-                              child: Text('READY'),
-                            ),
-                          ],
-                          onChanged: (v) => setModalState(
-                            () => supportProjectStatus = v,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: supportExtraConcernCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Support Extra Concern',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ],
                       const SizedBox(height: 14),
                       Row(
                         children: [
                           Expanded(
                             child: OutlinedButton(
                               onPressed: () {
-                                if (step > 0) {
+                                if (!isSupport && step > 0) {
                                   setModalState(() => step -= 1);
                                   return;
                                 }
                                 Navigator.of(ctx).pop();
                               },
-                              child: Text(step > 0 ? 'Back' : 'Cancel'),
+                              child: Text((!isSupport && step > 0) ? 'Back' : 'Cancel'),
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: FilledButton(
                               onPressed: () {
-                                if (step == 0) {
-                                  if (summaryCtrl.text.trim().isEmpty) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(content: Text('Summary is required')),
-                                    );
+                                if (!isSupport) {
+                                  if (step == 0) {
+                                    if (summaryCtrl.text.trim().isEmpty) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('Summary is required')),
+                                      );
+                                      return;
+                                    }
+                                    setModalState(() => step = 1);
                                     return;
                                   }
-                                  setModalState(() => step = 1);
-                                  return;
-                                }
-                                if (step == 1) {
-                                  setModalState(() => step = 2);
-                                  return;
+                                  if (step == 1) {
+                                    setModalState(() => step = 2);
+                                    return;
+                                  }
                                 }
 
                                 double? supportArea;
@@ -966,7 +989,7 @@ class _VisitsScreenState extends State<VisitsScreen> {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
                                         content: Text(
-                                          'Support project area must be a number',
+                                          'Support project area must be a valid number',
                                         ),
                                       ),
                                     );
@@ -991,27 +1014,27 @@ class _VisitsScreenState extends State<VisitsScreen> {
                                 Navigator.of(ctx).pop(
                                   _VisitResultPayload(
                                     submission: VisitResultSubmission(
-                                    summary: summaryCtrl.text.trim(),
-                                    clientMood: clientMoodCtrl.text,
-                                    note: noteCtrl.text,
-                                    projectStatus: projectStatus,
-                                    resultType: resultType,
-                                    clientPotentiality: potentiality ?? clientPotentialityCtrl.text,
-                                    projectType: projectType ?? projectTypeCtrl.text,
-                                    clientPersonality: clientPersonalityCtrl.text,
-                                    budgetRange: budgetRange ?? budgetRangeCtrl.text,
-                                    timelineUrgency: timelineUrgency ?? timelineUrgencyCtrl.text,
-                                    stylePreference: stylePreference ?? stylePreferenceCtrl.text,
-                                    supportClientName: supportClientNameCtrl.text,
-                                    supportProjectArea: supportArea,
-                                    supportProjectStatus: supportProjectStatus,
-                                    supportExtraConcern: supportExtraConcernCtrl.text,
-                                  ),
+                                      summary: summaryCtrl.text.trim(),
+                                      clientMood: clientMoodCtrl.text,
+                                      note: noteCtrl.text,
+                                      projectStatus: projectStatus,
+                                      resultType: resultType,
+                                      clientPotentiality: potentiality ?? clientPotentialityCtrl.text,
+                                      projectType: projectType ?? projectTypeCtrl.text,
+                                      clientPersonality: clientPersonalityCtrl.text,
+                                      budgetRange: budgetRange ?? budgetRangeCtrl.text,
+                                      timelineUrgency: timelineUrgency ?? timelineUrgencyCtrl.text,
+                                      stylePreference: stylePreference ?? stylePreferenceCtrl.text,
+                                      supportClientName: supportClientNameCtrl.text,
+                                      supportProjectArea: supportArea,
+                                      supportProjectStatus: supportProjectStatus,
+                                      supportExtraConcern: supportExtraConcernCtrl.text,
+                                    ),
                                     filePaths: List<String>.from(attachedFiles),
                                   ),
                                 );
                               },
-                              child: Text(step == 2 ? 'Submit' : 'Next'),
+                              child: Text((!isSupport && step < 2) ? 'Next' : 'Submit'),
                             ),
                           ),
                         ],
@@ -1114,15 +1137,34 @@ class _MetricChip extends StatelessWidget {
   }
 }
 
-class _VisitCard extends StatelessWidget {
-  const _VisitCard({required this.visit, this.onTap, this.onLongPress});
+class _VisitCard extends StatefulWidget {
+  const _VisitCard({
+    required this.visit,
+    this.currentUserId,
+    this.onTap,
+    this.onLongPress,
+  });
 
   final Visit visit;
+  final String? currentUserId;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
 
   @override
+  State<_VisitCard> createState() => _VisitCardState();
+}
+
+class _VisitCardState extends State<_VisitCard> {
+  bool _isExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final visit = widget.visit;
+    final currentUserId = widget.currentUserId;
+    final isSupportMember = currentUserId != null &&
+        visit.supportAssignments.any((a) => a.supportUserId == currentUserId) &&
+        visit.assignedToId != currentUserId;
+
     final statusLabel = _statusLabel(visit.status);
     final scheduledDate = _formatDateTime(visit.scheduledAt);
     final assignedName = visit.assignedTo?.fullName ?? 'Unassigned';
@@ -1165,23 +1207,36 @@ class _VisitCard extends StatelessWidget {
     }
 
     return GestureDetector(
-      onTap: onTap,
-      onLongPress: onLongPress,
-      child: Container(
+      onLongPress: widget.onLongPress,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
-          gradient: const LinearGradient(
+          border: Border.all(
+            color: isSupportMember 
+                ? const Color(0xFFE0B0FF).withValues(alpha: 0.8) 
+                : Colors.grey.withValues(alpha: 0.2),
+            width: isSupportMember ? 1.5 : 1.0,
+          ),
+          gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              Colors.white,
-              Color(0xFFF8F9FE),
-            ],
+            colors: isSupportMember 
+              ? [
+                  const Color(0xFFFDFBFF),
+                  const Color(0xFFF3E5F5).withValues(alpha: 0.6),
+                ]
+              : [
+                  Colors.white,
+                  const Color(0xFFF8F9FE),
+                ],
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: isSupportMember 
+                  ? const Color(0xFFE0B0FF).withValues(alpha: 0.2) 
+                  : Colors.black.withValues(alpha: 0.06),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -1191,8 +1246,12 @@ class _VisitCard extends StatelessWidget {
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(24),
           child: InkWell(
-            onTap: onTap,
-            onLongPress: onLongPress,
+            onTap: () {
+              setState(() {
+                _isExpanded = !_isExpanded;
+              });
+            },
+            onLongPress: widget.onLongPress,
             borderRadius: BorderRadius.circular(24),
             splashColor: CrmColors.brandPrimary.withValues(alpha: 0.05),
             child: Padding(
@@ -1203,6 +1262,11 @@ class _VisitCard extends StatelessWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (isSupportMember)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8.0, top: 2.0),
+                          child: Icon(Icons.people_alt, size: 20, color: const Color(0xFF8E24AA)),
+                        ),
                       Expanded(
                         child: Text(
                           visit.clientName,
@@ -1247,37 +1311,45 @@ class _VisitCard extends StatelessWidget {
                   _CardRow(
                     iconBg: Colors.white,
                     iconColor: CrmColors.brandPrimary.withValues(alpha: 0.6),
-                    icon: Icons.location_on_outlined,
-                    text: visit.location,
-                    shadowColor: Colors.black.withValues(alpha: 0.05),
-                  ),
-                  const SizedBox(height: 16),
-
-                  _CardRow(
-                    iconBg: Colors.white,
-                    iconColor: CrmColors.brandPrimary.withValues(alpha: 0.6),
                     icon: Icons.calendar_today_outlined,
                     text: scheduledDate,
                     shadowColor: Colors.black.withValues(alpha: 0.05),
                     bold: true,
                   ),
 
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.only(top: 16),
-                    decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(
-                          color: Colors.grey.withValues(alpha: 0.2),
+                  if (_isExpanded) ...[
+                    const SizedBox(height: 16),
+                    _CardRow(
+                      iconBg: Colors.white,
+                      iconColor: CrmColors.brandPrimary.withValues(alpha: 0.6),
+                      icon: Icons.location_on_outlined,
+                      text: visit.location,
+                      shadowColor: Colors.black.withValues(alpha: 0.05),
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.only(top: 16),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(
+                            color: Colors.grey.withValues(alpha: 0.2),
+                          ),
                         ),
                       ),
+                      child: _CardRow(
+                        iconBg: CrmColors.brandPrimary.withValues(alpha: 0.05),
+                        iconColor: CrmColors.brandPrimary,
+                        icon: Icons.person_outline_rounded,
+                        text: 'Assigned to: $assignedName',
+                        shadowColor: Colors.transparent,
+                      ),
                     ),
-                    child: _CardRow(
-                      iconBg: CrmColors.brandPrimary.withValues(alpha: 0.05),
-                      iconColor: CrmColors.brandPrimary,
-                      icon: Icons.person_outline_rounded,
-                      text: 'Assigned to: $assignedName',
-                      shadowColor: Colors.transparent,
+                  ],
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Icon(
+                      _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                      color: Colors.grey.withValues(alpha: 0.5),
                     ),
                   ),
                 ],

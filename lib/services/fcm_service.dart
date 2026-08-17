@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 
@@ -150,11 +151,24 @@ class FcmService {
   /// Gets the FCM token and registers it with the backend.
   static Future<void> registerToken(String authToken) async {
     try {
+      debugPrint('🔔 [FCM] registerToken called — requesting FCM token...');
+
+      // On iOS, FCM requires APNs token first. Request it explicitly.
+      // On Android this is a no-op.
+      await _messaging.getAPNSToken().catchError((_) => null);
+
       final fcmToken = await _messaging.getToken();
-      if (fcmToken == null) return;
+      if (fcmToken == null) {
+        debugPrint('🔔 [FCM] ⚠️ getToken() returned null — notifications disabled on this device');
+        return;
+      }
+
+      debugPrint('🔔 [FCM] Got FCM token (first 40 chars): ${fcmToken.substring(0, fcmToken.length.clamp(0, 40))}...');
 
       final uri = Uri.parse(AppConfig.apiBaseUrl).resolve('/api/device-tokens');
-      await http.post(
+      debugPrint('🔔 [FCM] Registering token at: $uri');
+
+      final response = await http.post(
         uri,
         headers: {
           'Content-Type': 'application/json',
@@ -166,12 +180,20 @@ class FcmService {
         }),
       ).timeout(const Duration(seconds: 15));
 
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        debugPrint('🔔 [FCM] ✅ Device token registered successfully (HTTP ${response.statusCode})');
+      } else {
+        debugPrint('🔔 [FCM] ❌ Failed to register token — HTTP ${response.statusCode}: ${response.body}');
+      }
+
       // Listen for token refreshes and re-register.
       _messaging.onTokenRefresh.listen((newToken) {
+        debugPrint('🔔 [FCM] Token refreshed — re-registering...');
         _reRegisterToken(authToken, newToken);
       });
-    } catch (_) {
-      // Silently fail — user can still use the app, just won't get push notifications.
+    } catch (e, stack) {
+      debugPrint('🔔 [FCM] ❌ registerToken error: $e');
+      debugPrint('🔔 [FCM] Stack: $stack');
     }
   }
 

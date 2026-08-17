@@ -19,8 +19,35 @@ class ClerkAuthenticationScreen extends StatefulWidget {
   State<ClerkAuthenticationScreen> createState() => _ClerkAuthenticationScreenState();
 }
 
+class _ClerkDynamicBackground extends Color {
+  const _ClerkDynamicBackground() : super(0x00000000);
+
+  @override
+  int get value {
+    final stack = StackTrace.current.toString();
+    if (stack.contains('RenderParagraph') || 
+        stack.contains('TextPainter') ||
+        stack.contains('Paragraph') ||
+        stack.contains('RichText')) {
+      return 0xFFFFFFFF; // White for button text/icon
+    }
+    return 0x00000000; // Transparent background to show background image
+  }
+}
+
 class _ClerkAuthenticationScreenState extends State<ClerkAuthenticationScreen> {
   bool _showClerkBox = false;
+
+  late final ClerkThemeColors _customClerkDarkColors = ClerkThemeColors(
+    background: const _ClerkDynamicBackground(),
+    altBackground: Colors.white.withOpacity(0.08),
+    borderSide: Colors.white.withOpacity(0.15),
+    text: Colors.white,
+    icon: Colors.white,
+    lightweightText: Colors.white.withOpacity(0.6),
+    error: const Color(0xFFff3333),
+    accent: const Color(0xFF6c47ff),
+  );
 
   @override
   void initState() {
@@ -49,10 +76,10 @@ class _ClerkAuthenticationScreenState extends State<ClerkAuthenticationScreen> {
               fit: BoxFit.cover,
             ),
           ),
-          // Dark Overlay for readability
+          // Very light dark overlay so background image is clearly visible
           Positioned.fill(
             child: Container(
-              color: Colors.black.withValues(alpha: 0.6),
+              color: Colors.black.withOpacity(0.15),
             ),
           ),
           
@@ -65,15 +92,12 @@ class _ClerkAuthenticationScreenState extends State<ClerkAuthenticationScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // App Logo
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
-                        ),
-                        child: Image.asset('assets/icon.png', width: 64, height: 64),
+                      // App Logo (clean and without round circle/border)
+                      Image.asset(
+                        'assets/ais-icon-dark.png',
+                        width: 72,
+                        height: 72,
+                        fit: BoxFit.contain,
                       ),
                       const SizedBox(height: 16),
                       
@@ -98,88 +122,89 @@ class _ClerkAuthenticationScreenState extends State<ClerkAuthenticationScreen> {
                       ),
                       const SizedBox(height: 40),
                       
-                      // Glass Card containing the Auth/Signed In state
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(24),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-                          child: Container(
-                            padding: const EdgeInsets.all(24),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                            ),
-                            child: SizedBox(
-                              height: 380, // Height matching the Clerk vertical login card
-                              child: widget.isSignedIn
-                                  ? Center(
+                      // Render ClerkAuthentication or the Signed-in block directly
+                      SizedBox(
+                        width: double.infinity,
+                        child: widget.isSignedIn
+                            ? Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+                                decoration: BoxDecoration(
+                                  color: Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.white.withOpacity(0.15), width: 0.5),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.check_circle_outline, color: Colors.greenAccent, size: 64),
+                                    const SizedBox(height: 24),
+                                    const Text('You are signed in.', style: TextStyle(fontSize: 16, color: Colors.white70)),
+                                    const SizedBox(height: 24),
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                                        backgroundColor: Colors.white,
+                                        foregroundColor: Colors.black87,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                                      ),
+                                      onPressed: widget.onContinue,
+                                      child: const Text('Continue to Dashboard', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    TextButton(
+                                      onPressed: () {
+                                        ClerkAuth.of(context, listen: false).signOut();
+                                      },
+                                      child: const Text('Sign Out', style: TextStyle(color: Colors.redAccent)),
+                                    )
+                                  ],
+                                ),
+                              )
+                            : Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  // The actual Clerk Authentication widget, loading invisibly first
+                                  AnimatedOpacity(
+                                    duration: const Duration(milliseconds: 600),
+                                    opacity: _showClerkBox ? 1.0 : 0.0,
+                                    child: IgnorePointer(
+                                      ignoring: !_showClerkBox,
+                                      child: Theme(
+                                        data: ThemeData.dark().copyWith(
+                                          extensions: [
+                                            ClerkThemeExtension(colors: _customClerkDarkColors),
+                                          ],
+                                        ),
+                                        child: const ClerkAuthentication(),
+                                      ),
+                                    ),
+                                  ),
+                                  
+                                  // The loading spinner, visible while checking for auto-login
+                                  if (!_showClerkBox)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 40.0),
                                       child: Column(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          const Icon(Icons.check_circle_outline, color: Colors.greenAccent, size: 64),
-                                          const SizedBox(height: 24),
-                                          const Text('You are signed in.', style: TextStyle(fontSize: 16, color: Colors.white70)),
-                                          const SizedBox(height: 24),
-                                          ElevatedButton(
-                                            style: ElevatedButton.styleFrom(
-                                              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                                              backgroundColor: Colors.white,
-                                              foregroundColor: Colors.black87,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                                            ),
-                                            onPressed: widget.onContinue,
-                                            child: const Text('Continue to Dashboard', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                          const SpinKitFoldingCube(
+                                            color: Colors.white,
+                                            size: 35.0,
                                           ),
-                                          const SizedBox(height: 16),
-                                          TextButton(
-                                            onPressed: () {
-                                              ClerkAuth.of(context, listen: false).signOut();
-                                            },
-                                            child: const Text('Sign Out', style: TextStyle(color: Colors.redAccent)),
-                                          )
+                                          const SizedBox(height: 24),
+                                          Text(
+                                            'Preparing your dashboard...',
+                                            style: TextStyle(
+                                              color: Colors.white.withValues(alpha: 0.8),
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
                                         ],
                                       ),
-                                    )
-                                  : Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        // The actual Clerk Authentication widget, loading invisibly first
-                                        AnimatedOpacity(
-                                          duration: const Duration(milliseconds: 600),
-                                          opacity: _showClerkBox ? 1.0 : 0.0,
-                                          child: IgnorePointer(
-                                            ignoring: !_showClerkBox,
-                                            child: const ClerkAuthentication(),
-                                          ),
-                                        ),
-                                        
-                                        // The loading spinner, visible while checking for auto-login
-                                        if (!_showClerkBox)
-                                          Column(
-                                            key: const ValueKey('loading_state'),
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const SpinKitFoldingCube(
-                                                color: Colors.white,
-                                                size: 35.0,
-                                              ),
-                                              const SizedBox(height: 24),
-                                              Text(
-                                                'Preparing your dashboard...',
-                                                style: TextStyle(
-                                                  color: Colors.white.withValues(alpha: 0.8),
-                                                  fontSize: 14,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                      ],
                                     ),
-                            ),
-                          ),
-                        ),
+                                ],
+                              ),
                       ),
                       const SizedBox(height: 40),
                     ],

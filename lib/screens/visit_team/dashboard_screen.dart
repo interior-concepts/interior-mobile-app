@@ -278,12 +278,17 @@ class _VisitTeamDashboardScreenState extends State<VisitTeamDashboardScreen> {
                 )
               : RefreshIndicator(
                   onRefresh: _loadDashboardData,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + kToolbarHeight + 16, 16, 40),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + kToolbarHeight + 16, 16, 40),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                         // ── Title ─────────────────────────────────────────
                         const Text(
                           'Overview',
@@ -341,9 +346,10 @@ class _VisitTeamDashboardScreenState extends State<VisitTeamDashboardScreen> {
                                   ],
                                 ),
                                 const SizedBox(height: 16),
-                                _StackedPerformanceCards(
-                                  topPerformer: _performance!.topPerformer,
-                                  currentUserPerformance: _performance!.currentUserPerformance,
+                                _VisitPerformanceShuffleCard(
+                                  topPerf: _performance!.topPerformer,
+                                  myPerf: _performance!.currentUserPerformance,
+                                  averagePerformance: _performance!.averagePerformance,
                                 ),
                               ],
                             ),
@@ -375,29 +381,29 @@ class _VisitTeamDashboardScreenState extends State<VisitTeamDashboardScreen> {
                               title: 'Completed',
                               count: _completedCount,
                               icon: Icons.check_circle_rounded,
-                              color: const Color(0xFF00A86B),
-                              gradientColors: const [Color(0xFF00C87A), Color(0xFF007A4D)],
+                              iconColor: const Color(0xFF00A86B),
+                              bgColor: const Color(0xFF00A86B).withValues(alpha: 0.08),
                             ),
                             _StatCard(
                               title: 'Pending',
                               count: _pendingCount,
                               icon: Icons.schedule_rounded,
-                              color: const Color(0xFFFF6B35),
-                              gradientColors: const [Color(0xFFFF8C42), Color(0xFFE84E0F)],
+                              iconColor: const Color(0xFFFF6B35),
+                              bgColor: const Color(0xFFFF6B35).withValues(alpha: 0.08),
                             ),
                             _StatCard(
                               title: 'Rescheduled',
                               count: _rescheduledCount,
                               icon: Icons.event_repeat_rounded,
-                              color: const Color(0xFF6C47FF),
-                              gradientColors: const [Color(0xFF8B6EFF), Color(0xFF5232D4)],
+                              iconColor: const Color(0xFF6C47FF),
+                              bgColor: const Color(0xFF6C47FF).withValues(alpha: 0.08),
                             ),
                             _StatCard(
                               title: 'Canceled',
                               count: _canceledCount,
                               icon: Icons.cancel_rounded,
-                              color: const Color(0xFFE5484D),
-                              gradientColors: const [Color(0xFFFF6B6B), Color(0xFFC0392B)],
+                              iconColor: const Color(0xFFE5484D),
+                              bgColor: const Color(0xFFE5484D).withValues(alpha: 0.08),
                             ),
                           ],
                         ).animate().fade(delay: 300.ms).slideY(begin: 0.1),
@@ -425,7 +431,11 @@ class _VisitTeamDashboardScreenState extends State<VisitTeamDashboardScreen> {
                           }),
                         ],
                       ],
-                    ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
     );
@@ -580,60 +590,36 @@ class _MissedSectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            CrmColors.error,
-            CrmColors.error.withValues(alpha: 0.8),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+    return Row(
+      children: [
+        const Icon(Icons.notification_important_rounded, size: 20, color: CrmColors.error),
+        const SizedBox(width: 8),
+        Text(
+          'Missed Schedule Priority',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+            color: CrmColors.foreground,
+            letterSpacing: -0.2,
+          ),
         ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: CrmColors.error.withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: CrmColors.error.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(50),
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              shape: BoxShape.circle,
-            ),
-            child:
-                const Icon(Icons.warning_rounded, color: Colors.white, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Missed Schedule Priority',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '$count visit${count == 1 ? '' : 's'} require immediate attention · Tap a card to act',
-                  style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.9), fontSize: 12),
-                ),
-              ],
+          child: Text(
+            '$count ACTION${count == 1 ? '' : 'S'}',
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: CrmColors.error,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -660,126 +646,81 @@ class _MissedVisitCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: CrmColors.error.withValues(alpha: 0.3)),
+          border: Border.all(color: Colors.grey.shade200),
           boxShadow: [
             BoxShadow(
-              color: CrmColors.error.withValues(alpha: 0.06),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 16,
-              offset: const Offset(0, 6),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
-        child: Column(
+        child: Row(
           children: [
-            // Red overdue banner
             Container(
-              width: double.infinity,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: CrmColors.error.withValues(alpha: 0.08),
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Row(
-                children: [
-                  const Icon(Icons.alarm_off_rounded,
-                      size: 13, color: CrmColors.error),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Overdue · $overdueStr',
-                    style: const TextStyle(
-                        color: CrmColors.error,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11),
-                  ),
-                ],
+              child: const Icon(
+                Icons.alarm_off_rounded,
+                color: CrmColors.error,
+                size: 24,
               ),
             ),
-            // Card body
-            Padding(
-              padding: const EdgeInsets.all(16),
+            const SizedBox(width: 16),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Client name row
+                  Text(
+                    visit.clientName,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: CrmColors.foreground,
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
+                      const Icon(Icons.location_on_outlined, size: 12, color: CrmColors.mutedForeground),
+                      const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          visit.clientName,
+                          visit.location,
                           style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: CrmColors.foreground,
-                            letterSpacing: -0.2,
+                            fontSize: 12,
+                            color: CrmColors.mutedForeground,
                           ),
-                        ),
-                      ),
-                      // Tap to act badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: CrmColors.brandPrimary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(50),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.touch_app_rounded,
-                                size: 11, color: CrmColors.brandPrimary),
-                            SizedBox(width: 4),
-                            Text(
-                              'TAP TO ACT',
-                              style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w800,
-                                  color: CrmColors.brandPrimary,
-                                  letterSpacing: 0.4),
-                            ),
-                          ],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-
-                  // Location
-                  _InfoRow(
-                    icon: Icons.location_on_outlined,
-                    text: visit.location,
-                    iconColor: CrmColors.brandPrimary.withValues(alpha: 0.6),
-                    textColor: CrmColors.mutedForeground,
-                  ),
                   const SizedBox(height: 6),
-
-                  // Scheduled date
-                  _InfoRow(
-                    icon: Icons.calendar_today_outlined,
-                    text: scheduledDate,
-                    iconColor: CrmColors.brandPrimary.withValues(alpha: 0.6),
-                    textColor: CrmColors.mutedForeground,
-                    bold: true,
-                  ),
-                  const SizedBox(height: 10),
-
-                  // Divider + assigned
-                  const Divider(height: 1, color: Color(0xFFEEEEEE)),
-                  const SizedBox(height: 10),
-                  _InfoRow(
-                    icon: Icons.person_outline_rounded,
-                    text: 'Assigned to: $assignedName',
-                    iconColor: CrmColors.brandPrimary,
-                    textColor: CrmColors.brandPrimary,
-                    bold: true,
+                  Text(
+                    '$assignedName • Missed $overdueStr',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: CrmColors.error,
+                    ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
+            Icon(Icons.chevron_right_rounded, color: Colors.grey.shade300, size: 24),
           ],
         ),
       ),
@@ -789,11 +730,11 @@ class _MissedVisitCard extends StatelessWidget {
   String _overdueLabel(DateTime scheduledAt) {
     final diff = DateTime.now().difference(scheduledAt.toLocal());
     if (diff.inDays > 0) {
-      return '${diff.inDays} day${diff.inDays == 1 ? '' : 's'} ago';
+      return '${diff.inDays}d';
     } else if (diff.inHours > 0) {
-      return '${diff.inHours}h ago';
+      return '${diff.inHours}h';
     } else {
-      return '${diff.inMinutes}m ago';
+      return '${diff.inMinutes}m';
     }
   }
 }
@@ -838,284 +779,475 @@ class _InfoRow extends StatelessWidget {
 
 // ─── Performance Card ─────────────────────────────────────────────────────────
 
-class _StackedPerformanceCards extends StatefulWidget {
-  const _StackedPerformanceCards({
-    required this.topPerformer,
-    required this.currentUserPerformance,
+class _VisitPerformanceShuffleCard extends StatefulWidget {
+  final VisitTopPerformer? myPerf;
+  final VisitTopPerformer? topPerf;
+  final int averagePerformance;
+
+  const _VisitPerformanceShuffleCard({
+    this.myPerf,
+    this.topPerf,
+    required this.averagePerformance,
   });
 
-  final VisitTopPerformer? topPerformer;
-  final VisitTopPerformer? currentUserPerformance;
-
   @override
-  State<_StackedPerformanceCards> createState() => _StackedPerformanceCardsState();
+  State<_VisitPerformanceShuffleCard> createState() => _VisitPerformanceShuffleCardState();
 }
 
-class _StackedPerformanceCardsState extends State<_StackedPerformanceCards> {
-  bool _isMineFront = false;
+class _VisitPerformanceShuffleCardState extends State<_VisitPerformanceShuffleCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  bool _showingTop = false;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 3), (timer) {
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
       if (!mounted) return;
-      setState(() {
-        _isMineFront = !_isMineFront;
-      });
+      _toggleCard();
+    });
+  }
+
+  void _toggleCard() {
+    setState(() {
+      _showingTop = !_showingTop;
+    });
+    _controller.forward(from: 0).then((_) {
+      if (!mounted) return;
+      _controller.value = 1.0;
     });
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _controller.dispose();
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final topScore = widget.topPerformer?.performance ?? 1;
-    final myScore = widget.currentUserPerformance?.performance ?? 0;
-    
-    final maxScore = topScore > 0 ? topScore : 1; 
-    final myProgress = (myScore / maxScore).clamp(0.0, 1.0);
-
-    final topCard = _PerformanceCard(
-      title: 'Top Performer',
-      name: widget.topPerformer?.fullName ?? 'N/A',
-      score: widget.topPerformer?.performance ?? 0,
-      icon: Icons.emoji_events_rounded,
-      gradientColors: const [Color(0xFFFFB347), Color(0xFFFF6B00)],
-      accentColor: Colors.amber,
-      isTop: true,
-    );
-
-    final myCard = _PerformanceCard(
-      title: 'My Performance',
-      name: widget.currentUserPerformance?.fullName ?? 'You',
-      score: widget.currentUserPerformance?.performance ?? 0,
-      icon: Icons.person_rounded,
-      gradientColors: const [Color(0xFF8B6EFF), Color(0xFF5232D4)],
-      accentColor: CrmColors.brandPrimary,
-    );
-
-    final topCardWidget = AnimatedPositioned(
-      key: const ValueKey('topCard'),
-      duration: const Duration(milliseconds: 600),
-      curve: Curves.easeInOutCubic,
-      top: !_isMineFront ? 24 : 0,
-      left: !_isMineFront ? 0 : 24,
-      right: !_isMineFront ? 24 : 0,
-      child: AnimatedScale(
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeInOutCubic,
-        scale: !_isMineFront ? 1.0 : 0.88,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 600),
-          opacity: !_isMineFront ? 1.0 : 0.35,
-          child: topCard,
-        ),
-      ),
-    );
-
-    final myCardWidget = AnimatedPositioned(
-      key: const ValueKey('myCard'),
-      duration: const Duration(milliseconds: 600),
-      curve: Curves.easeInOutCubic,
-      top: _isMineFront ? 24 : 0,
-      left: _isMineFront ? 0 : 24,
-      right: _isMineFront ? 24 : 0,
-      child: AnimatedScale(
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeInOutCubic,
-        scale: _isMineFront ? 1.0 : 0.88,
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 600),
-          opacity: _isMineFront ? 1.0 : 0.35,
-          child: myCard,
-        ),
-      ),
-    );
-
-    return SizedBox(
-      height: 220,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: _isMineFront
-            ? [topCardWidget, myCardWidget]
-            : [myCardWidget, topCardWidget],
-      ),
-    );
-  }
-}
-
-class _PerformanceCard extends StatelessWidget {
-  const _PerformanceCard({
-    required this.title,
-    required this.name,
-    required this.score,
-    required this.icon,
-    required this.gradientColors,
-    required this.accentColor,
-    this.progress,
-    this.isTop = false,
-  });
-
-  final String title;
-  final String name;
-  final int score;
-  final IconData icon;
-  final List<Color> gradientColors;
-  final Color accentColor;
-  final double? progress;
-  final bool isTop;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(28),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: gradientColors,
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: gradientColors.first.withValues(alpha: 0.5),
-                blurRadius: 30,
-                spreadRadius: -6,
-                offset: const Offset(0, 16),
-              ),
-            ],
+  Widget _buildMyCard(int myScore) {
+    final perf = widget.myPerf;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
-          child: Stack(
-            clipBehavior: Clip.hardEdge,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              // Large bg decorative icon
-              Positioned(
-                right: -20,
-                bottom: -20,
-                child: Icon(
-                  icon,
-                  size: 110,
-                  color: Colors.white.withValues(alpha: 0.06),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(50),
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header row
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(icon, size: 20, color: Colors.white),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.white.withValues(alpha: 0.85),
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ),
-                      if (isTop)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(50),
-                          ),
-                          child: const Text(
-                            '🏆 #1',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  // Score
-                  Text(
-                    score.toString(),
-                    style: const TextStyle(
-                      fontSize: 40,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      height: 1.0,
-                      letterSpacing: -2,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    name,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white.withValues(alpha: 0.75),
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (progress != null) ...[
-                    const SizedBox(height: 16),
-                    // Progress label
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'vs. Top Performer',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: Colors.white.withValues(alpha: 0.6),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          '${(progress! * 100).toStringAsFixed(0)}%',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        backgroundColor: Colors.white.withValues(alpha: 0.15),
-                        valueColor:
-                            const AlwaysStoppedAnimation<Color>(Colors.white),
-                        minHeight: 7,
+                child: Row(
+                  children: [
+                    Icon(Icons.person_rounded, size: 12, color: Colors.grey.shade600),
+                    const SizedBox(width: 4),
+                    Text(
+                      'My Performance',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade600,
+                        letterSpacing: 0.3,
                       ),
                     ),
                   ],
-                ],
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'This month · Visits',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
               ),
             ],
           ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      perf != null
+                          ? 'Hey, ${perf.fullName.split(' ').first}! 👋'
+                          : 'My Score',
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        color: CrmColors.foreground,
+                        height: 1.1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: myScore >= 80
+                      ? Colors.green.shade50
+                      : myScore >= 55
+                          ? Colors.blue.shade50
+                          : Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: myScore >= 80
+                        ? Colors.green.shade200
+                        : myScore >= 55
+                            ? Colors.blue.shade200
+                            : Colors.orange.shade200,
+                  ),
+                ),
+                child: Text(
+                  '$myScore',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    color: myScore >= 80
+                        ? Colors.green.shade700
+                        : myScore >= 55
+                            ? Colors.blue.shade700
+                            : Colors.orange.shade700,
+                    height: 1,
+                    letterSpacing: -1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Score progress',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: CrmColors.mutedForeground,
+                ),
+              ),
+              Text(
+                'Avg: ${widget.averagePerformance}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: CrmColors.brandPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Stack(
+            children: [
+              Container(
+                height: 10,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              FractionallySizedBox(
+                widthFactor: (myScore / 100).clamp(0.0, 1.0),
+                child: Container(
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: myScore >= 80
+                        ? Colors.green.shade500
+                        : myScore >= 55
+                            ? Colors.blue.shade500
+                            : Colors.orange.shade500,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              if (widget.averagePerformance > 0)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: (widget.averagePerformance / 100).clamp(0.0, 1.0),
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Container(
+                        width: 4,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: CrmColors.brandPrimary,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Icon(Icons.info_outline_rounded, size: 14, color: Colors.grey.shade400),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Your score is based on completed and punctual visits this month.',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopCard(int topScore) {
+    final top = widget.topPerf;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            CrmColors.foreground,
+            CrmColors.foreground.withValues(alpha: 0.9),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: CrmColors.foreground.withValues(alpha: 0.3),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(50),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.star_rounded, size: 12, color: Colors.amber),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'Top Performer',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.amber,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              const Text(
+                'Leading this month',
+                style: TextStyle(fontSize: 13, color: Colors.white54),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(
+                  (top?.fullName != null && top!.fullName.trim().isNotEmpty) ? top.fullName : 'Top Performer',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white10,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  '$topScore',
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.amber,
+                    height: 1,
+                    letterSpacing: -1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Score progress',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white54,
+                ),
+              ),
+              const Text(
+                'Monthly / 100',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.amber,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Stack(
+            children: [
+              Container(
+                height: 10,
+                decoration: BoxDecoration(
+                  color: Colors.white12,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              FractionallySizedBox(
+                widthFactor: (topScore / 100).clamp(0.0, 1.0),
+                child: Container(
+                  height: 10,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Colors.amber, Colors.orange],
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Visibility(
+            visible: false,
+            maintainSize: true,
+            maintainAnimation: true,
+            maintainState: true,
+            child: Row(
+              children: [
+                Icon(Icons.info_outline_rounded, size: 14, color: Colors.grey.shade400),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Your score is based on completed and punctual visits this month.',
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final myScore = widget.myPerf?.performance ?? 0;
+    final topScore = widget.topPerf?.performance ?? 0;
+
+    return GestureDetector(
+      onTap: () {
+        _startTimer();
+        _toggleCard();
+      },
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity != null && details.primaryVelocity!.abs() > 100) {
+          _startTimer();
+          _toggleCard();
+        }
+      },
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          final curve = CurvedAnimation(parent: _controller, curve: Curves.easeInOutBack);
+          final slideOut = Tween<Offset>(begin: Offset.zero, end: const Offset(-0.2, 0)).evaluate(curve);
+          final slideIn = Tween<Offset>(begin: const Offset(0.2, 0), end: Offset.zero).evaluate(curve);
+          final scaleOut = Tween<double>(begin: 1.0, end: 0.95).evaluate(curve);
+          final scaleIn = Tween<double>(begin: 0.95, end: 1.0).evaluate(curve);
+
+          final progress = _controller.value;
+
+          return Stack(
+            children: [
+              if (_showingTop || progress > 0)
+                Transform.translate(
+                  offset: Offset((_showingTop ? slideIn.dx : slideOut.dx) * 200, 0),
+                  child: Transform.scale(
+                    scale: _showingTop ? scaleIn : scaleOut,
+                    child: Opacity(
+                      opacity: _showingTop ? progress : (1 - progress),
+                      child: _buildTopCard(topScore),
+                    ),
+                  ),
+                ),
+              if (!_showingTop || progress > 0)
+                Transform.translate(
+                  offset: Offset((!_showingTop ? slideIn.dx : slideOut.dx) * 200, 0),
+                  child: Transform.scale(
+                    scale: !_showingTop ? scaleIn : scaleOut,
+                    child: Opacity(
+                      opacity: !_showingTop ? progress : (1 - progress),
+                      child: _buildMyCard(myScore),
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1128,106 +1260,72 @@ class _StatCard extends StatelessWidget {
     required this.title,
     required this.count,
     required this.icon,
-    required this.color,
-    required this.gradientColors,
+    required this.iconColor,
+    required this.bgColor,
   });
 
   final String title;
   final int count;
   final IconData icon;
-  final Color color;
-  final List<Color> gradientColors;
+  final Color iconColor;
+  final Color bgColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: gradientColors,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
-            color: gradientColors.first.withValues(alpha: 0.45),
-            blurRadius: 20,
-            spreadRadius: -4,
-            offset: const Offset(0, 10),
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Stack(
-        clipBehavior: Clip.hardEdge,
-        children: [
-          // Decorative large background icon
-          Positioned(
-            right: -16,
-            bottom: -16,
-            child: Icon(
-              icon,
-              size: 90,
-              color: Colors.white.withValues(alpha: 0.08),
-            ),
-          ),
-          // Decorative circle accent top-right
-          Positioned(
-            top: -18,
-            right: -18,
-            child: Container(
-              width: 70,
-              height: 70,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.08),
+                color: bgColor,
+                borderRadius: BorderRadius.circular(14),
               ),
+              child: Icon(icon, size: 22, color: iconColor),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Icon badge
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(12),
+                Text(
+                  count.toString(),
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: CrmColors.foreground,
+                    height: 1.1,
+                    letterSpacing: -1,
                   ),
-                  child: Icon(icon, size: 20, color: Colors.white),
                 ),
-                // Count + label
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      count.toString(),
-                      style: const TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        height: 1.0,
-                        letterSpacing: -1,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.white.withValues(alpha: 0.8),
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: CrmColors.mutedForeground,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2,
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

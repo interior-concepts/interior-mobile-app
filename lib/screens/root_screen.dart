@@ -52,7 +52,18 @@ class _RootScreenState extends State<RootScreen> {
       
       if (_isSeniorCrm || _isVisitTeam) {
         // Start polling for in-app badge updates.
-        NotificationManager.instance.startPolling(token);
+        // Pass a tokenRefresher so every API call uses a fresh JWT (Clerk JWTs expire ~60s).
+        NotificationManager.instance.startPolling(
+          token,
+          tokenRefresher: () async {
+            try {
+              final freshSession = await authState.sessionToken();
+              return freshSession.jwt.isNotEmpty ? freshSession.jwt : null;
+            } catch (_) {
+              return null;
+            }
+          },
+        );
         // Register FCM token so backend can send push notifications
         // when the app is in the background or killed.
         FcmService.registerToken(token);

@@ -92,18 +92,14 @@ class CrmMobileApp extends StatelessWidget {
         final serverMsg = error.errors?.errorMessage ?? error.message;
         final lower = serverMsg.toLowerCase();
         if (lower.contains('password') || lower.contains('incorrect')) {
-          title = 'Incorrect Password';
-          body = 'The password you entered is incorrect.';
-          hint =
-              'Double-check your password or use "Forgot password" to reset it.';
+          // Return early to let Clerk display password errors inline inside the form.
+          return;
         } else if (lower.contains('identifier') ||
             lower.contains('email') ||
             lower.contains('not found') ||
             lower.contains('no user')) {
-          title = 'Account Not Found';
-          body = 'No account exists for this email address.';
-          hint =
-              'Please check your email or contact your administrator to get access.';
+          // Return early to let Clerk display email/identifier errors inline inside the form.
+          return;
         } else if (lower.contains('already signed in') ||
             lower.contains('session exists')) {
           // Ghost-session: user is already being redirected — skip the dialog.

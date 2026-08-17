@@ -53,8 +53,8 @@ class MobileAppHeader extends StatelessWidget implements PreferredSizeWidget {
         child: Center(
           child: Image.asset(
             'assets/icon.png',
-            width: 32,
-            height: 32,
+            width: 40,
+            height: 40,
             fit: BoxFit.contain,
           ),
         ),

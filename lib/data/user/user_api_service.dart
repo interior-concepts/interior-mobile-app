@@ -19,17 +19,31 @@ class CurrentUser {
   });
 
   bool get isVisitTeamLeader {
-    return roles.any((r) =>
-        r.toUpperCase() == 'VISIT_TEAM_LEADER' ||
-        r.toUpperCase() == 'VISIT_TEAM_CO_LEADER');
+    return roles.any((r) {
+      final normalized = r.toUpperCase().replaceAll(' ', '_').replaceAll('-', '_');
+      return normalized == 'VISIT_TEAM_LEADER' ||
+          normalized == 'VISIT_TEAM_CO_LEADER';
+    });
   }
 
   bool get isSeniorCrm {
-    return departments.any((d) => d.toUpperCase() == 'SR_CRM');
+    return departments.any((d) {
+      final normalized = d.toUpperCase().replaceAll(' ', '_').replaceAll('-', '_');
+      return normalized == 'SR_CRM' || normalized == 'SENIOR_CRM';
+    }) || roles.any((r) {
+      final normalized = r.toUpperCase().replaceAll(' ', '_').replaceAll('-', '_');
+      return normalized == 'SR_CRM' || normalized == 'SENIOR_CRM';
+    });
   }
 
   bool get isVisitTeam {
-    return departments.any((d) => d.toUpperCase() == 'VISIT_TEAM');
+    return departments.any((d) {
+      final normalized = d.toUpperCase().replaceAll(' ', '_').replaceAll('-', '_');
+      return normalized == 'VISIT_TEAM';
+    }) || roles.any((r) {
+      final normalized = r.toUpperCase().replaceAll(' ', '_').replaceAll('-', '_');
+      return normalized == 'VISIT_TEAM' || normalized == 'VISIT_TEAM_MEMBER';
+    });
   }
 
   factory CurrentUser.fromJson(Map<String, dynamic> json) {

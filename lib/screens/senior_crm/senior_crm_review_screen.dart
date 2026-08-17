@@ -95,6 +95,78 @@ class _SeniorCrmReviewScreenState extends State<SeniorCrmReviewScreen> {
     }
   }
 
+  Future<void> _submitDecision(String submissionId, String decision, String? summary) async {
+    try {
+      showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
+      
+      final url = Uri.parse('https://www.aestheticinteriorbd.com/api/cad-work/review-center/$submissionId/decision');
+      final token = await _getToken();
+      
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          if (token != null) 'Authorization': 'Bearer $token',
+        },
+        body: json.encode({
+          'decision': decision,
+          if (summary != null) 'summary': summary,
+        }),
+      );
+      
+      if (mounted) Navigator.of(context).pop(); // dismiss loading dialog
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final decoded = json.decode(response.body);
+        if (decoded['success'] == true) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(decoded['message'] ?? 'Decision submitted')));
+          _fetchData(); // refresh list
+        } else {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(decoded['error'] ?? 'Failed to submit decision')));
+        }
+      } else {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to submit decision (HTTP ${response.statusCode})')));
+      }
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop(); // dismiss loading dialog if error
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  void _showSummaryDialog(ReviewSubmission submission, String decision, String title, String hint) {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        content: TextField(
+          controller: controller,
+          decoration: InputDecoration(
+            hintText: hint,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          maxLines: 3,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: decision == 'DROP' ? Colors.red.shade600 : Colors.black87, foregroundColor: Colors.white),
+            onPressed: () {
+              final text = controller.text.trim();
+              if (text.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Summary is required')));
+                return;
+              }
+              Navigator.of(ctx).pop();
+              _submitDecision(submission.id, decision, text);
+            },
+            child: const Text('Submit'),
+          ),
+        ],
+      )
+    );
+  }
+
   List<ReviewSubmission> get _filteredSubmissions {
     List<ReviewSubmission> filtered = _submissions;
 
@@ -304,7 +376,7 @@ class _SeniorCrmReviewScreenState extends State<SeniorCrmReviewScreen> {
               ElevatedButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  // TODO: Implement approve logic
+                  _submitDecision(submission.id, 'APPROVE', null);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.black87,
@@ -320,7 +392,7 @@ class _SeniorCrmReviewScreenState extends State<SeniorCrmReviewScreen> {
               OutlinedButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  // TODO: Implement correction/cancel logic
+                  _showSummaryDialog(submission, 'CORRECTION', 'Send for Correction', 'Enter correction summary/details...');
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.black87,
@@ -336,7 +408,7 @@ class _SeniorCrmReviewScreenState extends State<SeniorCrmReviewScreen> {
               OutlinedButton(
                 onPressed: () {
                   Navigator.of(ctx).pop();
-                  // TODO: Implement drop project logic
+                  _showSummaryDialog(submission, 'DROP', 'Drop Project', 'Enter reason for dropping project...');
                 },
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.red.shade600,
@@ -362,330 +434,13 @@ class _SeniorCrmReviewScreenState extends State<SeniorCrmReviewScreen> {
   }
 
   Widget _buildSubmissionCard(ReviewSubmission submission) {
-    Color baseColor;
-    
-    if (submission.phaseType == 'quotation') {
-      baseColor = Colors.orange;
-    } else if (submission.phaseType == 'visualizer') {
-      baseColor = Colors.teal;
-    } else {
-      baseColor = Colors.deepPurple;
-    }
-
-    // Slightly stronger base for pending items to stand out
-    final intensity = submission.isPendingReview ? 1.0 : 0.6;
-    final fgColor = baseColor.withOpacity(0.9 * intensity);
-    final lightBg = baseColor.withOpacity(0.08 * intensity);
-    final borderColor = baseColor.withOpacity(0.2 * intensity);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: borderColor, width: submission.isPendingReview ? 1.5 : 1),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white,
-            submission.isPendingReview ? baseColor.withOpacity(0.06) : Colors.white,
-          ],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: baseColor.withOpacity(submission.isPendingReview ? 0.12 : 0.04),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(24),
-        child: InkWell(
-          onLongPress: submission.isPendingReview
-              ? () => _showActionBottomSheet(context, submission)
-              : null,
-          borderRadius: BorderRadius.circular(24),
-          splashColor: baseColor.withOpacity(0.1),
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Title and Status
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        submission.leadName,
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.black87,
-                          letterSpacing: -0.3,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: lightBg,
-                        borderRadius: BorderRadius.circular(50),
-                        border: Border.all(color: borderColor),
-                      ),
-                      child: Text(
-                        submission.phaseType.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: fgColor,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Location Row
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2))
-                        ],
-                        border: Border.all(color: Colors.grey.withOpacity(0.1)),
-                      ),
-                      child: Icon(Icons.location_on_outlined, size: 16, color: fgColor),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text(
-                          submission.leadLocation,
-                          style: TextStyle(fontSize: 14, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                
-                const SizedBox(height: 16),
-                
-                // Assigned By Row
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2))
-                        ],
-                        border: Border.all(color: Colors.grey.withOpacity(0.1)),
-                      ),
-                      child: Icon(Icons.person_outline, size: 16, color: fgColor),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Text(
-                          'Submitted by ${submission.submittedBy}',
-                          style: TextStyle(fontSize: 14, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                if (submission.note != null && submission.note!.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.grey.withOpacity(0.15)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.notes_rounded, size: 14, color: Colors.grey.shade500),
-                            const SizedBox(width: 6),
-                            Text(
-                              'SUBMISSION NOTE',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey.shade600,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          submission.note!,
-                          style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.5),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      ),
+    return ReviewSubmissionCard(
+      submission: submission,
+      onLongPress: () => _showActionBottomSheet(context, submission),
     );
   }
 
-  Widget _buildSkeletonLoading() {
-    const shimmerBase = Color(0xFFEEEEEE);
-    const shimmerHighlight = Color(0xFFF8F8F8);
 
-    Widget skeletonCard() {
-      return Container(
-        margin: const EdgeInsets.only(bottom: 20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFEEEEEE)),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Title row + phase badge
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: Container(
-                    height: 20,
-                    decoration: BoxDecoration(
-                      color: shimmerBase,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Container(
-                  width: 64,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    color: shimmerBase,
-                    borderRadius: BorderRadius.circular(50),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // Location row
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: shimmerBase,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Container(
-                    height: 13,
-                    decoration: BoxDecoration(
-                      color: shimmerBase,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 40),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Submitter row
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Container(
-                  width: 32,
-                  height: 32,
-                  decoration: BoxDecoration(
-                    color: shimmerBase,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  flex: 3,
-                  child: Container(
-                    height: 13,
-                    decoration: BoxDecoration(
-                      color: shimmerBase,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 80),
-              ],
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Skeletonizer(
-      enabled: true,
-      effect: const ShimmerEffect(
-        baseColor: shimmerBase,
-        highlightColor: shimmerHighlight,
-        duration: Duration(milliseconds: 1200),
-      ),
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-        children: [
-          skeletonCard(),
-          skeletonCard(),
-          skeletonCard(),
-          skeletonCard(),
-        ],
-      ),
-    );
-  }
 
 
   @override
@@ -696,7 +451,7 @@ class _SeniorCrmReviewScreenState extends State<SeniorCrmReviewScreen> {
         title: 'Review Center',
         onRefresh: _fetchData,
       ),
-      body: _isLoading ? _buildSkeletonLoading() : Column(
+      body: Column(
               children: [
                 // Breadcrumbs
                 Padding(
@@ -798,7 +553,9 @@ class _SeniorCrmReviewScreenState extends State<SeniorCrmReviewScreen> {
                           // Stats Filter Section
                           Container(
                             padding: const EdgeInsets.fromLTRB(16, 0, 0, 12),
-                            child: SingleChildScrollView(
+                            child: Skeletonizer(
+                              enabled: _isLoading,
+                              child: SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               physics: const BouncingScrollPhysics(),
                               child: Row(
@@ -811,7 +568,8 @@ class _SeniorCrmReviewScreenState extends State<SeniorCrmReviewScreen> {
                               ),
                             ),
                           ),
-                        ],
+                        ),
+                      ],
                       ),
                     ),
                   ),
@@ -819,25 +577,297 @@ class _SeniorCrmReviewScreenState extends State<SeniorCrmReviewScreen> {
 
                 // Submissions List
                 Expanded(
-                  child: _filteredSubmissions.isEmpty
-                      ? const Center(
-                          child: Text(
-                            'No submissions found.',
-                            style: TextStyle(color: Colors.black54),
+                  child: (_isLoading && _filteredSubmissions.isEmpty)
+                      ? Skeletonizer(
+                          enabled: true,
+                          child: ListView.builder(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: 3,
+                            itemBuilder: (context, index) {
+                              return ReviewSubmissionCard(
+                                submission: ReviewSubmission(
+                                  id: '',
+                                  leadName: 'Loading Lead Name Placeholder',
+                                  leadPhone: '01712345678',
+                                  leadLocation: 'Loading Address Placeholder',
+                                  stage: 'CAD_PHASE',
+                                  subStatus: 'CAD_COMPLETED',
+                                  submittedBy: 'Loading User',
+                                  submittedAt: DateTime.now(),
+                                  fileCount: 0,
+                                  phaseType: 'cad',
+                                ),
+                              );
+                            },
                           ),
                         )
-                      : ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          physics: const BouncingScrollPhysics(),
-                          itemCount: _filteredSubmissions.length,
-                          itemBuilder: (context, index) {
-                            return _buildSubmissionCard(_filteredSubmissions[index]);
-                          },
-                        ),
+                      : _filteredSubmissions.isEmpty
+                          ? const Center(
+                              child: Text(
+                                'No submissions found.',
+                                style: TextStyle(color: Colors.black54),
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              physics: const BouncingScrollPhysics(),
+                              itemCount: _filteredSubmissions.length,
+                              itemBuilder: (context, index) {
+                                return _buildSubmissionCard(_filteredSubmissions[index]);
+                              },
+                            ),
                 ),
               ],
             ),
+    );
+  }
+}
+
+class ReviewSubmissionCard extends StatefulWidget {
+  final ReviewSubmission submission;
+  final VoidCallback? onLongPress;
+
+  const ReviewSubmissionCard({
+    super.key,
+    required this.submission,
+    this.onLongPress,
+  });
+
+  @override
+  State<ReviewSubmissionCard> createState() => _ReviewSubmissionCardState();
+}
+
+class _ReviewSubmissionCardState extends State<ReviewSubmissionCard> {
+  bool _isExpanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    Color baseColor;
+    
+    if (widget.submission.phaseType == 'quotation') {
+      baseColor = Colors.orange;
+    } else if (widget.submission.phaseType == 'visualizer') {
+      baseColor = Colors.teal;
+    } else {
+      baseColor = Colors.deepPurple;
+    }
+
+    final intensity = widget.submission.isPendingReview ? 1.0 : 0.6;
+    final fgColor = baseColor.withValues(alpha: 0.9 * intensity);
+    final lightBg = baseColor.withValues(alpha: 0.08 * intensity);
+    final borderColor = baseColor.withValues(alpha: 0.2 * intensity);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: borderColor, width: widget.submission.isPendingReview ? 1.5 : 1),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white,
+            widget.submission.isPendingReview ? baseColor.withValues(alpha: 0.06) : Colors.white,
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: baseColor.withValues(alpha: widget.submission.isPendingReview ? 0.12 : 0.04),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(24),
+        child: InkWell(
+          onTap: () {
+            setState(() {
+              _isExpanded = !_isExpanded;
+            });
+          },
+          onLongPress: widget.onLongPress,
+          borderRadius: BorderRadius.circular(24),
+          splashColor: baseColor.withValues(alpha: 0.1),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Title and Status
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.submission.leadName,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black87,
+                          letterSpacing: -0.3,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: lightBg,
+                            borderRadius: BorderRadius.circular(50),
+                            border: Border.all(color: borderColor),
+                          ),
+                          child: Text(
+                            widget.submission.phaseType.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: fgColor,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Icon(
+                          _isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                          color: Colors.grey.shade400,
+                          size: 20,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  alignment: Alignment.topCenter,
+                  child: _isExpanded
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 16),
+                            Divider(color: Colors.grey.shade200, height: 1),
+                            const SizedBox(height: 16),
+                            
+                            // Location Row
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    boxShadow: [
+                                      BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2))
+                                    ],
+                                    border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
+                                  ),
+                                  child: Icon(Icons.location_on_outlined, size: 16, color: fgColor),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Text(
+                                      widget.submission.leadLocation,
+                                      style: TextStyle(fontSize: 14, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            
+                            const SizedBox(height: 16),
+                            
+                            // Assigned By Row
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    boxShadow: [
+                                      BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 2))
+                                    ],
+                                    border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
+                                  ),
+                                  child: Icon(Icons.person_outline, size: 16, color: fgColor),
+                                ),
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(top: 6),
+                                    child: Text(
+                                      'Submitted by ${widget.submission.submittedBy}',
+                                      style: TextStyle(fontSize: 14, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            if (widget.submission.note != null && widget.submission.note!.isNotEmpty) ...[
+                              const SizedBox(height: 24),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: Colors.grey.withValues(alpha: 0.15)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(Icons.notes_rounded, size: 14, color: Colors.grey.shade500),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'SUBMISSION NOTE',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey.shade600,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      widget.submission.note!,
+                                      style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.5),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

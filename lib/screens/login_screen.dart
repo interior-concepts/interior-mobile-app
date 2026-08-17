@@ -261,7 +261,7 @@ class _MobileHeader extends StatelessWidget {
             borderRadius: BorderRadius.circular(CrmTheme.radiusMd),
             border: Border.all(color: CrmColors.border),
           ),
-          child: Image.asset('assets/images/aesthetic-icon.png'),
+          child: Image.asset('assets/ais-icon-dark.png'),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -300,7 +300,7 @@ class _InfoPanel extends StatelessWidget {
                 borderRadius: BorderRadius.circular(CrmTheme.radiusMd),
                 border: Border.all(color: CrmColors.border),
               ),
-              child: Image.asset('assets/images/aesthetic-icon.png'),
+              child: Image.asset('assets/ais-icon-dark.png'),
             ),
             const SizedBox(width: 12),
             Expanded(

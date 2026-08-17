@@ -274,14 +274,23 @@ class _SearchBar extends StatelessWidget {
 
 // ─── Visit Card ───────────────────────────────────────────────────────────────
 
-class _VisitCard extends StatelessWidget {
+class _VisitCard extends StatefulWidget {
   const _VisitCard({required this.visit, required this.onLongPress});
 
   final Visit visit;
   final VoidCallback onLongPress;
 
   @override
+  State<_VisitCard> createState() => _VisitCardState();
+}
+
+class _VisitCardState extends State<_VisitCard> {
+  bool _isExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
+    final visit = widget.visit;
+    final onLongPress = widget.onLongPress;
     final scheduledDate = visit.scheduledAt != null
         ? DateFormat('dd MMM yyyy, hh:mm a').format(visit.scheduledAt!.toLocal())
         : 'Date not set';
@@ -334,16 +343,18 @@ class _VisitCard extends StatelessWidget {
 
     return GestureDetector(
       onLongPress: onLongPress,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: Colors.grey.withValues(alpha: 0.2)),
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
               Colors.white,
-              const Color(0xFFF8F9FE), // very light tint for premium look
+              Color(0xFFF8F9FE), // very light tint for premium look
             ],
           ),
           boxShadow: [
@@ -358,6 +369,11 @@ class _VisitCard extends StatelessWidget {
           color: Colors.transparent,
           borderRadius: BorderRadius.circular(24),
           child: InkWell(
+            onTap: () {
+              setState(() {
+                _isExpanded = !_isExpanded;
+              });
+            },
             onLongPress: onLongPress,
             borderRadius: BorderRadius.circular(24),
             splashColor: CrmColors.brandPrimary.withValues(alpha: 0.05),
@@ -412,16 +428,6 @@ class _VisitCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 24), // mb-6 equivalent between title and body
 
-                  // ── Location ──
-                  _CardRow(
-                    iconBg: Colors.white,
-                    iconColor: CrmColors.brandPrimary.withValues(alpha: 0.6),
-                    icon: Icons.location_on_outlined,
-                    text: visit.location,
-                    shadowColor: Colors.black.withValues(alpha: 0.05),
-                  ),
-                  const SizedBox(height: 16), // space-y-4
-
                   // ── Date ──
                   _CardRow(
                     iconBg: Colors.white,
@@ -432,24 +438,43 @@ class _VisitCard extends StatelessWidget {
                     bold: true,
                   ),
 
-                  // ── Assigned to ──
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.only(top: 16), // pt-4
-                    decoration: BoxDecoration(
-                      border: Border(
-                        top: BorderSide(
-                          color: Colors.grey.withValues(alpha: 0.2), // border-t border-outline-variant/20
+                  if (_isExpanded) ...[
+                    const SizedBox(height: 16), // space-y-4
+                    // ── Location ──
+                    _CardRow(
+                      iconBg: Colors.white,
+                      iconColor: CrmColors.brandPrimary.withValues(alpha: 0.6),
+                      icon: Icons.location_on_outlined,
+                      text: visit.location,
+                      shadowColor: Colors.black.withValues(alpha: 0.05),
+                    ),
+
+                    // ── Assigned to ──
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.only(top: 16), // pt-4
+                      decoration: BoxDecoration(
+                        border: Border(
+                          top: BorderSide(
+                            color: Colors.grey.withValues(alpha: 0.2), // border-t
+                          ),
                         ),
                       ),
+                      child: _CardRow(
+                        iconBg: CrmColors.brandPrimary.withValues(alpha: 0.05), // bg-primary/5
+                        iconColor: CrmColors.brandPrimary,
+                        icon: Icons.person_outline_rounded,
+                        text: 'Assigned to: $assignedName',
+                        textColor: CrmColors.brandPrimary,
+                        bold: true,
+                      ),
                     ),
-                    child: _CardRow(
-                      iconBg: CrmColors.brandPrimary.withValues(alpha: 0.05), // bg-primary/5
-                      iconColor: CrmColors.brandPrimary,
-                      icon: Icons.person_outline_rounded,
-                      text: 'Assigned to: $assignedName',
-                      textColor: CrmColors.brandPrimary,
-                      bold: true,
+                  ],
+                  const SizedBox(height: 16),
+                  Center(
+                    child: Icon(
+                      _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                      color: Colors.grey.withValues(alpha: 0.5),
                     ),
                   ),
 

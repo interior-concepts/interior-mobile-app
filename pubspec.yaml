@@ -37,21 +37,28 @@ dev_dependencies:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: assets/icon.png
+  macos:
+    generate: true
+    image_path: "assets/icon.png"
+  web:
+    generate: true
+    image_path: "assets/icon.png"
+  image_path: "assets/icon.png"
   min_sdk_android: 21
   remove_alpha_ios: true
 
 flutter_native_splash:
   color: "#FFFFFF"
-  image: assets/icon.png
+  image: "assets/icon.png"
   android: true
   ios: true
-  web: false
+  web: true
 
 flutter:
   uses-material-design: true
   assets:
     - assets/icon.png
+    - assets/ais-icon-dark.png
     - assets/images/checkbackground.jpg
     - assets/images/favicon-16x16.png
     - assets/mobileBanner3.jpeg

@@ -260,9 +260,10 @@ class _SimpleVisitCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
+      child: ExpansionTile(
         title: Text(visit.clientName),
-        subtitle: Text(visit.location),
+        subtitle: Text(visit.status.name.toUpperCase()),
+        childrenPadding: const EdgeInsets.all(16.0),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -282,6 +283,23 @@ class _SimpleVisitCard extends StatelessWidget {
             ),
           ],
         ),
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),
+              const SizedBox(width: 8),
+              Expanded(child: Text(visit.location)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              const Icon(Icons.person_outline, size: 16, color: Colors.grey),
+              const SizedBox(width: 8),
+              Expanded(child: Text('Assigned: ${visit.assignedTo?.fullName ?? 'Unassigned'}')),
+            ],
+          ),
+        ],
       ),
     );
   }

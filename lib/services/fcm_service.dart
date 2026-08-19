@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -176,7 +177,7 @@ class FcmService {
         },
         body: jsonEncode({
           'token': fcmToken,
-          'platform': 'android',
+          'platform': Platform.isIOS ? 'ios' : 'android',
         }),
       ).timeout(const Duration(seconds: 15));
 
@@ -208,7 +209,7 @@ class FcmService {
         },
         body: jsonEncode({
           'token': fcmToken,
-          'platform': 'android',
+          'platform': Platform.isIOS ? 'ios' : 'android',
         }),
       ).timeout(const Duration(seconds: 15));
     } catch (_) {}

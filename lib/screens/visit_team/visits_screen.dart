@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 
 import '../../data/visits/visit.dart';
 import '../../data/visits/visit_api_service.dart';
+import '../../data/user/user_api_service.dart';
 import '../../widgets/mobile_app_header.dart';
 import '../../theme/crm_colors.dart';
 
@@ -47,12 +48,8 @@ class _VisitsScreenState extends State<VisitsScreen> {
       final token = await _getClerkJwt();
       if (token != null) {
         try {
-          final parts = token.split('.');
-          if (parts.length == 3) {
-            final payloadStr = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
-            final payload = jsonDecode(payloadStr);
-            _currentUserId = payload['sub'] as String?;
-          }
+          final user = await UserApiService().fetchMe(token);
+          _currentUserId = user?.id;
         } catch (_) {}
       }
 
@@ -391,9 +388,23 @@ class _VisitsScreenState extends State<VisitsScreen> {
 
 
   Future<void> _showVisitActionMenu(Visit visit) async {
-    final isSupportMember = _currentUserId != null &&
-        visit.supportAssignments.any((a) => a.supportUserId == _currentUserId) &&
-        visit.assignedToId != _currentUserId;
+    final isAssigned = _currentUserId != null &&
+        visit.assignedToId != null &&
+        _currentUserId == visit.assignedToId;
+
+    if (!isAssigned) {
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (ctx) => _SupportMemberSheet(visit: visit),
+      );
+      return;
+    }
 
     final action = await showModalBottomSheet<String>(
       context: context,
@@ -408,23 +419,21 @@ class _VisitsScreenState extends State<VisitsScreen> {
                 title: const Text('Complete'),
                 onTap: () => Navigator.of(ctx).pop('complete'),
               ),
-              if (!isSupportMember) ...[
-                ListTile(
-                  leading: const Icon(Icons.person_add_alt_1_outlined),
-                  title: const Text('Add Support Members'),
-                  onTap: () => Navigator.of(ctx).pop('add_support'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.event_repeat_outlined),
-                  title: const Text('Reschedule'),
-                  onTap: () => Navigator.of(ctx).pop('reschedule'),
-                ),
-                ListTile(
-                  leading: const Icon(Icons.cancel_outlined),
-                  title: const Text('Cancel'),
-                  onTap: () => Navigator.of(ctx).pop('cancel'),
-                ),
-              ],
+              ListTile(
+                leading: const Icon(Icons.person_add_alt_1_outlined),
+                title: const Text('Add Support Members'),
+                onTap: () => Navigator.of(ctx).pop('add_support'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.event_repeat_outlined),
+                title: const Text('Reschedule'),
+                onTap: () => Navigator.of(ctx).pop('reschedule'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.cancel_outlined),
+                title: const Text('Cancel'),
+                onTap: () => Navigator.of(ctx).pop('cancel'),
+              ),
             ],
           ),
         );
@@ -1255,7 +1264,7 @@ class _VisitCardState extends State<_VisitCard> {
             borderRadius: BorderRadius.circular(24),
             splashColor: CrmColors.brandPrimary.withValues(alpha: 0.05),
             child: Padding(
-              padding: const EdgeInsets.all(28),
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1264,24 +1273,24 @@ class _VisitCardState extends State<_VisitCard> {
                     children: [
                       if (isSupportMember)
                         Padding(
-                          padding: const EdgeInsets.only(right: 8.0, top: 2.0),
-                          child: Icon(Icons.people_alt, size: 20, color: const Color(0xFF8E24AA)),
+                          padding: const EdgeInsets.only(right: 6.0, top: 2.0),
+                          child: Icon(Icons.people_alt, size: 16, color: const Color(0xFF8E24AA)),
                         ),
                       Expanded(
                         child: Text(
                           visit.clientName,
                           style: TextStyle(
-                            fontSize: 22,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                             color: CrmColors.foreground,
-                            letterSpacing: -0.3,
+                            letterSpacing: -0.2,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 12),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
+                            horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           color: statusBg,
                           borderRadius: BorderRadius.circular(50),
@@ -1290,12 +1299,12 @@ class _VisitCardState extends State<_VisitCard> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(statusIcon, size: 14, color: statusFg),
-                            const SizedBox(width: 6),
+                            Icon(statusIcon, size: 12, color: statusFg),
+                            const SizedBox(width: 4),
                             Text(
                               statusLabel.toUpperCase(),
                               style: TextStyle(
-                                fontSize: 11,
+                                fontSize: 9,
                                 fontWeight: FontWeight.bold,
                                 color: statusFg,
                                 letterSpacing: 0.5,
@@ -1306,7 +1315,7 @@ class _VisitCardState extends State<_VisitCard> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
 
                   _CardRow(
                     iconBg: Colors.white,
@@ -1318,7 +1327,7 @@ class _VisitCardState extends State<_VisitCard> {
                   ),
 
                   if (_isExpanded) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 8),
                     _CardRow(
                       iconBg: Colors.white,
                       iconColor: CrmColors.brandPrimary.withValues(alpha: 0.6),
@@ -1326,9 +1335,9 @@ class _VisitCardState extends State<_VisitCard> {
                       text: visit.location,
                       shadowColor: Colors.black.withValues(alpha: 0.05),
                     ),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
                     Container(
-                      padding: const EdgeInsets.only(top: 16),
+                      padding: const EdgeInsets.only(top: 12),
                       decoration: BoxDecoration(
                         border: Border(
                           top: BorderSide(
@@ -1345,7 +1354,7 @@ class _VisitCardState extends State<_VisitCard> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 8),
                   Center(
                     child: Icon(
                       _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
@@ -1413,39 +1422,114 @@ class _CardRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: iconBg,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: shadowColor,
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Icon(icon, size: 16, color: iconColor),
-        ),
-        const SizedBox(width: 12),
+        Icon(icon, size: 16, color: iconColor),
+        const SizedBox(width: 8),
         Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(
-              text,
-              style: TextStyle(
-                fontSize: 14,
-                color: CrmColors.mutedForeground,
-                height: 1.4,
-                fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
-              ),
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              color: CrmColors.mutedForeground,
+              height: 1.4,
+              fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
             ),
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Support Member Sheet ─────────────────────────────────────────────────────
+
+class _SupportMemberSheet extends StatelessWidget {
+  const _SupportMemberSheet({required this.visit});
+  final Visit visit;
+
+  @override
+  Widget build(BuildContext context) {
+    final assignedName =
+        visit.assignedTo?.fullName ?? visit.assignedTo?.email ?? 'the assigned member';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF6C47FF).withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.shield_outlined,
+              size: 40,
+              color: Color(0xFF6C47FF),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Support Member',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: CrmColors.foreground,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'You are a support member on this visit. Only $assignedName (the assigned member) can take actions.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14,
+              color: CrmColors.mutedForeground,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8F8FC),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.person_outline_rounded, size: 18, color: CrmColors.mutedForeground),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Assigned to: $assignedName',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: CrmColors.foreground,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF6C47FF),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

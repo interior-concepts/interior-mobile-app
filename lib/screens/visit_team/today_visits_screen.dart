@@ -7,8 +7,10 @@ import 'package:fui_kit/fui_kit.dart';
 
 import '../../data/visits/visit.dart';
 import '../../data/visits/visit_api_service.dart';
+import '../../data/user/user_api_service.dart';
 import '../../widgets/mobile_app_header.dart';
 import '../../theme/crm_colors.dart';
+import '../../widgets/visit_card_widget.dart';
 
 class TodayVisitsScreen extends StatefulWidget {
   const TodayVisitsScreen({super.key});
@@ -23,6 +25,7 @@ class _TodayVisitsScreenState extends State<TodayVisitsScreen> {
   bool _loading = true;
   String? _error;
   List<Visit> _todayVisits = const [];
+  String? _currentUserId;
 
   @override
   void initState() {
@@ -38,6 +41,13 @@ class _TodayVisitsScreenState extends State<TodayVisitsScreen> {
 
     try {
       final token = await _getClerkJwt();
+      if (token != null) {
+        try {
+          final user = await UserApiService().fetchMe(token);
+          _currentUserId = user?.id;
+        } catch (_) {}
+      }
+      
       final visits = await _visitApiService.fetchVisits(
         status: 'SCHEDULED', // We'll fetch all to catch completed as well, or just scheduled? The user wants "today visits", let's remove status filter to get all today's visits.
         authTokenOverride: token,
@@ -181,11 +191,15 @@ class _TodayVisitsScreenState extends State<TodayVisitsScreen> {
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final visit = _todayVisits[index];
-                      return _TimelineCard(
-                        visit: visit,
-                        isFirst: index == 0,
-                        isLast: index == _todayVisits.length - 1,
-                      ).animate().fade(delay: (300 + (index * 80)).ms).slideX(begin: 0.1);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: VisitCardWidget(
+                          visit: visit,
+                          currentUserId: _currentUserId,
+                          onTap: () => _showVisitActionMenu(visit),
+                          onLongPress: () => _showVisitActionMenu(visit),
+                        ).animate().fade(delay: (300 + (index * 80)).ms).slideX(begin: 0.1),
+                      );
                     },
                     childCount: _todayVisits.length,
                   ),
@@ -198,132 +212,63 @@ class _TodayVisitsScreenState extends State<TodayVisitsScreen> {
       ),
     );
   }
-}
 
-class _TimelineCard extends StatelessWidget {
-  const _TimelineCard({required this.visit, required this.isFirst, required this.isLast});
-  
-  final Visit visit;
-  final bool isFirst;
-  final bool isLast;
+  Future<void> _showVisitActionMenu(Visit visit) async {
+    final isAssigned = _currentUserId != null &&
+        visit.assignedToId != null &&
+        _currentUserId == visit.assignedToId;
 
-  @override
-  Widget build(BuildContext context) {
-    final timeStr = visit.scheduledAt != null ? DateFormat('hh:mm a').format(visit.scheduledAt!.toLocal()) : 'TBD';
-    final isPast = visit.scheduledAt != null && visit.scheduledAt!.isBefore(DateTime.now());
-    
-    // Status colors
-    Color statusColor = CrmColors.brandPrimary;
-    if (visit.status == VisitStatus.completed) {
-      statusColor = CrmColors.success;
-    } else if (visit.status == VisitStatus.cancelled) {
-      statusColor = CrmColors.error;
-    } else if (isPast && visit.status == VisitStatus.scheduled) {
-      statusColor = Colors.orange;
+    if (!isAssigned) {
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (ctx) => SupportMemberSheet(visit: visit),
+      );
+      return;
     }
 
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Timeline indicator
-          SizedBox(
-            width: 36,
-            child: Column(
-              children: [
-                Container(
-                  width: 2,
-                  height: 24,
-                  color: isFirst ? Colors.transparent : CrmColors.border,
-                ),
-                Container(
-                  width: 14,
-                  height: 14,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: statusColor, width: 3),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(color: statusColor.withValues(alpha: 0.3), blurRadius: 8, spreadRadius: 1)
-                    ]
-                  ),
-                ),
-                Expanded(
-                  child: Container(
-                    width: 2,
-                    color: isLast ? Colors.transparent : CrmColors.border,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // Card content
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 20),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: CrmColors.border.withValues(alpha: 0.6)),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4)),
-                  ]
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: statusColor.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            timeStr,
-                            style: TextStyle(color: statusColor, fontWeight: FontWeight.w700, fontSize: 12),
-                          ),
-                        ),
-                        const Spacer(),
-                        if (visit.status == VisitStatus.completed)
-                          const Icon(Icons.check_circle_rounded, color: CrmColors.success, size: 18)
-                        else if (visit.status == VisitStatus.cancelled)
-                          const Icon(Icons.cancel_rounded, color: CrmColors.error, size: 18),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      visit.clientName,
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: CrmColors.foreground, letterSpacing: -0.3),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.only(top: 2),
-                          child: FUI(RegularRounded.mapMarkerHome, color: CrmColors.mutedForeground, width: 14, height: 14),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            visit.location,
-                            style: const TextStyle(color: CrmColors.mutedForeground, fontSize: 13, height: 1.4),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.check_circle_outline),
+                title: const Text('Complete'),
+                onTap: () => Navigator.of(ctx).pop('complete'),
               ),
-            ),
+              ListTile(
+                leading: const Icon(Icons.person_add_alt_1_outlined),
+                title: const Text('Add Support Members'),
+                onTap: () => Navigator.of(ctx).pop('add_support'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.event_repeat_outlined),
+                title: const Text('Reschedule'),
+                onTap: () => Navigator.of(ctx).pop('reschedule'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.cancel_outlined),
+                title: const Text('Cancel'),
+                onTap: () => Navigator.of(ctx).pop('cancel'),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
+    );
+
+    if (action == null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Action "$action" needs to be implemented here (like in Visits page)')),
     );
   }
 }

@@ -64,7 +64,9 @@ class _VisitTeamHomeScreenState extends State<VisitTeamHomeScreen> {
     }
 
     final screens = [
-      const VisitTeamDashboardScreen(),
+      VisitTeamDashboardScreen(
+        onNavigateToVisits: () => setState(() => _currentIndex = 1),
+      ),
       const VisitsScreen(),
       const TodayVisitsScreen(),
       if (_isLeader) const ControlVisitsScreen() else const MySupportScreen(),
@@ -73,7 +75,6 @@ class _VisitTeamHomeScreenState extends State<VisitTeamHomeScreen> {
     final safeIndex = _currentIndex.clamp(0, screens.length - 1);
 
     return Scaffold(
-      extendBody: true,
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
         transitionBuilder: (child, animation) {

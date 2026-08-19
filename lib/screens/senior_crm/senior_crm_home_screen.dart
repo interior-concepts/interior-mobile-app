@@ -28,7 +28,6 @@ class _SeniorCrmHomeScreenState extends State<SeniorCrmHomeScreen> {
     ];
 
     return Scaffold(
-      extendBody: true,
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
         transitionBuilder: (child, animation) {

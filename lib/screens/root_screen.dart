@@ -49,7 +49,7 @@ class _RootScreenState extends State<RootScreen> {
         _isVisitTeam = user?.isVisitTeam ?? false;
         _isLoading = false;
       });
-      
+
       if (_isSeniorCrm || _isVisitTeam) {
         // Start polling for in-app badge updates.
         // Pass a tokenRefresher so every API call uses a fresh JWT (Clerk JWTs expire ~60s).
@@ -86,7 +86,7 @@ class _RootScreenState extends State<RootScreen> {
     if (_isSeniorCrm) {
       return const SeniorCrmHomeScreen();
     }
-    
+
     if (_isVisitTeam) {
       return const VisitTeamHomeScreen();
     }

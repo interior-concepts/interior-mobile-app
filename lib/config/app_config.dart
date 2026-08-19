@@ -4,7 +4,7 @@ class AppConfig {
   // Deployment base URL (no path). Endpoint is appended in API services.
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://aesthetic-interior-oms.vercel.app',
+    defaultValue: 'https://www.aestheticinteriorbd.com',
   );
 
   static const String apiAuthToken = String.fromEnvironment(

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:clerk_flutter/clerk_flutter.dart';
@@ -9,11 +10,15 @@ import 'package:intl/intl.dart';
 import '../../data/visits/visit.dart';
 import '../../data/visits/visit_api_service.dart';
 import '../../data/visits/dashboard_performance_data.dart';
+import '../../data/user/user_api_service.dart';
 import '../../widgets/mobile_app_header.dart';
 import '../../theme/crm_colors.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 
 class VisitTeamDashboardScreen extends StatefulWidget {
-  const VisitTeamDashboardScreen({super.key});
+  const VisitTeamDashboardScreen({super.key, this.onNavigateToVisits});
+
+  final VoidCallback? onNavigateToVisits;
 
   @override
   State<VisitTeamDashboardScreen> createState() =>
@@ -32,6 +37,7 @@ class _VisitTeamDashboardScreenState extends State<VisitTeamDashboardScreen> {
   int _pendingCount = 0;
   int _rescheduledCount = 0;
   int _canceledCount = 0;
+  String? _currentUserId;
 
   @override
   void initState() {
@@ -57,6 +63,15 @@ class _VisitTeamDashboardScreenState extends State<VisitTeamDashboardScreen> {
 
     try {
       final token = await _getToken();
+
+      // Fetch current user from DB to get the UUID (since assignedToId uses DB UUID, not Clerk ID)
+      if (token != null) {
+        try {
+          final user = await UserApiService().fetchMe(token);
+          _currentUserId = user?.id;
+        } catch (_) {}
+      }
+
       final perfFuture =
           _apiService.fetchDashboardPerformance(authTokenOverride: token);
       final visitsFuture = _apiService.fetchVisits(authTokenOverride: token);
@@ -114,6 +129,25 @@ class _VisitTeamDashboardScreenState extends State<VisitTeamDashboardScreen> {
   // ─── Action handling (same pattern as visits_screen) ──────────────────────
 
   Future<void> _showVisitActionSheet(Visit visit) async {
+    // Support members can view but not take actions — only the assigned person can.
+    final isAssigned = _currentUserId != null &&
+        visit.assignedToId != null &&
+        _currentUserId == visit.assignedToId;
+
+    if (!isAssigned) {
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        showDragHandle: true,
+        backgroundColor: Colors.white,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        builder: (ctx) => _SupportMemberSheet(visit: visit),
+      );
+      return;
+    }
+
     final action = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -252,182 +286,184 @@ class _VisitTeamDashboardScreenState extends State<VisitTeamDashboardScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F8FC),
-      extendBodyBehindAppBar: true,
       appBar: MobileAppHeader(title: 'Dashboard', onRefresh: _loadDashboardData),
-      body: _loading
-          ? const Center(
-              child: SpinKitFoldingCube(color: CrmColors.brandPrimary, size: 40))
-          : _error != null
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.error_outline,
-                          size: 48, color: CrmColors.error),
-                      const SizedBox(height: 12),
-                      Text('Failed to load dashboard',
-                          style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 16),
-                      FilledButton(
-                          style: FilledButton.styleFrom(
-                              backgroundColor: CrmColors.brandPrimary),
-                          onPressed: _loadDashboardData,
-                          child: const Text('Retry')),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: _loadDashboardData,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      return SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                          child: Padding(
-                            padding: EdgeInsets.fromLTRB(16, MediaQuery.paddingOf(context).top + kToolbarHeight + 16, 16, 40),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                        // ── Title ─────────────────────────────────────────
-                        const Text(
-                          'Overview',
-                          style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w800,
-                            color: CrmColors.foreground,
-                            letterSpacing: -0.5,
-                          ),
-                        ).animate().fade(duration: 400.ms).slideY(begin: -0.2),
+      body: _error != null && !_loading
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline,
+                      size: 48, color: CrmColors.error),
+                  const SizedBox(height: 12),
+                  Text('Failed to load dashboard',
+                      style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                      style: FilledButton.styleFrom(
+                          backgroundColor: CrmColors.brandPrimary),
+                      onPressed: _loadDashboardData,
+                      child: const Text('Retry')),
+                ],
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _loadDashboardData,
+              child: Skeletonizer(
+                enabled: _loading,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final perf = _loading 
+                        ? DashboardPerformanceData(
+                            averagePerformance: 80,
+                            currentUserPerformance: VisitTopPerformer(id: '1', fullName: 'Loading User', performance: 70),
+                            topPerformer: VisitTopPerformer(id: '2', fullName: 'Loading Top', performance: 95),
+                          )
+                        : _performance;
+                        
+                    final missedList = _loading && _missedVisits.isEmpty
+                        ? [
+                            Visit.fromJson({
+                              'id': 'dummy',
+                              'leadId': 'dummy',
+                              'status': 'SCHEDULED',
+                            })
+                          ]
+                        : _missedVisits;
 
-                        const SizedBox(height: 20),
-
-                        // ── Performance Section ─────────────────────────────
-                        if (_performance != null) ...[
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: CrmColors.brandPrimary.withValues(alpha: 0.04),
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(color: CrmColors.brandPrimary.withValues(alpha: 0.1)),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.insights_rounded, size: 18, color: CrmColors.brandPrimary),
-                                    const SizedBox(width: 8),
-                                    const Text(
-                                      'Performance Metrics',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w800,
-                                        color: CrmColors.brandPrimary,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: CrmColors.brandPrimary,
-                                        borderRadius: BorderRadius.circular(50),
-                                      ),
-                                      child: const Text(
-                                        'LIVE',
+                    return SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // ── Performance Section ─────────────────────────────
+                              if (perf != null) ...[
+                                Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: CrmColors.brandPrimary.withValues(alpha: 0.04),
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(color: CrmColors.brandPrimary.withValues(alpha: 0.1)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.insights_rounded, size: 18, color: CrmColors.brandPrimary),
+                                      const SizedBox(width: 8),
+                                      const Text(
+                                        'Performance Metrics',
                                         style: TextStyle(
-                                          fontSize: 9,
+                                          fontSize: 16,
                                           fontWeight: FontWeight.w800,
-                                          color: Colors.white,
-                                          letterSpacing: 0.5,
+                                          color: CrmColors.brandPrimary,
                                         ),
                                       ),
-                                    ).animate(onPlay: (controller) => controller.repeat(reverse: true)).fade(begin: 0.4, end: 1.0, duration: 800.ms),
-                                  ],
-                                ),
+                                      const Spacer(),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: CrmColors.brandPrimary,
+                                          borderRadius: BorderRadius.circular(50),
+                                        ),
+                                        child: const Text(
+                                          'LIVE',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ).animate(onPlay: (controller) => controller.repeat(reverse: true)).fade(begin: 0.4, end: 1.0, duration: 800.ms),
+                                    ],
+                                  ),
+                                ).animate().fade(delay: 100.ms).slideY(begin: 0.1),
                                 const SizedBox(height: 16),
                                 _VisitPerformanceShuffleCard(
-                                  topPerf: _performance!.topPerformer,
-                                  myPerf: _performance!.currentUserPerformance,
-                                  averagePerformance: _performance!.averagePerformance,
-                                ),
+                                  topPerf: perf.topPerformer,
+                                  myPerf: perf.currentUserPerformance,
+                                  averagePerformance: perf.averagePerformance,
+                                ).animate().fade(delay: 150.ms).slideY(begin: 0.1),
+                                const SizedBox(height: 24),
                               ],
-                            ),
-                          ).animate().fade(delay: 100.ms).slideY(begin: 0.1),
-                          const SizedBox(height: 24),
-                        ],
 
-                        // ── 4 Stat Cards ──────────────────────────────────
-                        const Text(
-                          'Visit Statistics',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: CrmColors.foreground,
-                          ),
-                        ).animate().fade(delay: 200.ms).slideX(begin: -0.1),
-                        const SizedBox(height: 12),
+                              // ── 4 Stat Cards ──────────────────────────────────
+                              const Text(
+                                'Visit Statistics',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: CrmColors.foreground,
+                                ),
+                              ).animate().fade(delay: 200.ms).slideX(begin: -0.1),
+                              const SizedBox(height: 12),
 
-                        GridView.count(
-                          padding: EdgeInsets.zero,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: 2,
-                          mainAxisSpacing: 14,
-                          crossAxisSpacing: 14,
-                          childAspectRatio: 1.25,
-                          children: [
-                            _StatCard(
-                              title: 'Completed',
-                              count: _completedCount,
-                              icon: Icons.check_circle_rounded,
-                              iconColor: const Color(0xFF00A86B),
-                              bgColor: const Color(0xFF00A86B).withValues(alpha: 0.08),
-                            ),
-                            _StatCard(
-                              title: 'Pending',
-                              count: _pendingCount,
-                              icon: Icons.schedule_rounded,
-                              iconColor: const Color(0xFFFF6B35),
-                              bgColor: const Color(0xFFFF6B35).withValues(alpha: 0.08),
-                            ),
-                            _StatCard(
-                              title: 'Rescheduled',
-                              count: _rescheduledCount,
-                              icon: Icons.event_repeat_rounded,
-                              iconColor: const Color(0xFF6C47FF),
-                              bgColor: const Color(0xFF6C47FF).withValues(alpha: 0.08),
-                            ),
-                            _StatCard(
-                              title: 'Canceled',
-                              count: _canceledCount,
-                              icon: Icons.cancel_rounded,
-                              iconColor: const Color(0xFFE5484D),
-                              bgColor: const Color(0xFFE5484D).withValues(alpha: 0.08),
-                            ),
-                          ],
-                        ).animate().fade(delay: 300.ms).slideY(begin: 0.1),
+                              GridView.count(
+                                padding: EdgeInsets.zero,
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                crossAxisCount: 2,
+                                mainAxisSpacing: 14,
+                                crossAxisSpacing: 14,
+                                childAspectRatio: 1.25,
+                                children: [
+                                  _StatCard(
+                                    title: 'Completed',
+                                    count: _loading ? 8 : _completedCount,
+                                    icon: Icons.check_circle_rounded,
+                                    iconColor: const Color(0xFF00A86B),
+                                    bgColor: const Color(0xFF00A86B).withValues(alpha: 0.08),
+                                    onTap: widget.onNavigateToVisits,
+                                  ),
+                                  _StatCard(
+                                    title: 'Pending',
+                                    count: _loading ? 4 : _pendingCount,
+                                    icon: Icons.schedule_rounded,
+                                    iconColor: const Color(0xFFFF6B35),
+                                    bgColor: const Color(0xFFFF6B35).withValues(alpha: 0.08),
+                                    onTap: widget.onNavigateToVisits,
+                                  ),
+                                  _StatCard(
+                                    title: 'Rescheduled',
+                                    count: _loading ? 2 : _rescheduledCount,
+                                    icon: Icons.event_repeat_rounded,
+                                    iconColor: const Color(0xFF6C47FF),
+                                    bgColor: const Color(0xFF6C47FF).withValues(alpha: 0.08),
+                                    onTap: widget.onNavigateToVisits,
+                                  ),
+                                  _StatCard(
+                                    title: 'Canceled',
+                                    count: _loading ? 1 : _canceledCount,
+                                    icon: Icons.cancel_rounded,
+                                    iconColor: const Color(0xFFE5484D),
+                                    bgColor: const Color(0xFFE5484D).withValues(alpha: 0.08),
+                                    onTap: widget.onNavigateToVisits,
+                                  ),
+                                ],
+                              ).animate().fade(delay: 300.ms).slideY(begin: 0.1),
 
-                        // ── Missed Schedule Priority ───────────────────────
-                        if (_missedVisits.isNotEmpty) ...[
-                          const SizedBox(height: 28),
-                          _MissedSectionHeader(count: _missedVisits.length)
-                              .animate()
-                              .fade(delay: 400.ms)
-                              .slideX(begin: -0.1),
-                          const SizedBox(height: 12),
-                          ...List.generate(_missedVisits.length, (i) {
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 14),
-                              child: _MissedVisitCard(
-                                visit: _missedVisits[i],
-                                onTap: () =>
-                                    _showVisitActionSheet(_missedVisits[i]),
-                              ),
-                            )
-                                .animate()
-                                .fade(delay: (450 + i * 60).ms)
-                                .slideY(begin: 0.1);
+                              // ── Missed Schedule Priority ───────────────────────
+                              if (missedList.isNotEmpty) ...[
+                                const SizedBox(height: 28),
+                                _MissedSectionHeader(count: missedList.length)
+                                    .animate()
+                                    .fade(delay: 400.ms)
+                                    .slideX(begin: -0.1),
+                                const SizedBox(height: 12),
+                                ...List.generate(missedList.length, (i) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 14),
+                                    child: _MissedVisitCard(
+                                      visit: missedList[i],
+                                      onTap: () =>
+                                          _showVisitActionSheet(missedList[i]),
+                                    ),
+                                  )
+                                      .animate()
+                                      .fade(delay: (450 + i * 60).ms)
+                                      .slideY(begin: 0.1);
                           }),
                         ],
                       ],
@@ -438,6 +474,99 @@ class _VisitTeamDashboardScreenState extends State<VisitTeamDashboardScreen> {
                     },
                   ),
                 ),
+              ),
+    );
+  }
+}
+
+// ─── Support Member Sheet ─────────────────────────────────────────────────────
+
+class _SupportMemberSheet extends StatelessWidget {
+  const _SupportMemberSheet({required this.visit});
+  final Visit visit;
+
+  @override
+  Widget build(BuildContext context) {
+    final assignedName =
+        visit.assignedTo?.fullName ?? visit.assignedTo?.email ?? 'the assigned member';
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF6C47FF).withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.shield_outlined,
+              size: 40,
+              color: Color(0xFF6C47FF),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Support Member',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: CrmColors.foreground,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'You are a support member on this visit. Only $assignedName (the assigned member) can take actions.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14,
+              color: CrmColors.mutedForeground,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8F8FC),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.person_outline_rounded, size: 18, color: CrmColors.mutedForeground),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Assigned to: $assignedName',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: CrmColors.foreground,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF6C47FF),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -794,44 +923,35 @@ class _VisitPerformanceShuffleCard extends StatefulWidget {
   State<_VisitPerformanceShuffleCard> createState() => _VisitPerformanceShuffleCardState();
 }
 
-class _VisitPerformanceShuffleCardState extends State<_VisitPerformanceShuffleCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  bool _showingTop = false;
+class _VisitPerformanceShuffleCardState extends State<_VisitPerformanceShuffleCard> {
+  final PageController _pageController = PageController();
   Timer? _timer;
+  int _currentPage = 0;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
     _startTimer();
   }
 
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
-      if (!mounted) return;
-      _toggleCard();
-    });
-  }
-
-  void _toggleCard() {
-    setState(() {
-      _showingTop = !_showingTop;
-    });
-    _controller.forward(from: 0).then((_) {
-      if (!mounted) return;
-      _controller.value = 1.0;
+      if (mounted) {
+        _currentPage = _currentPage == 0 ? 1 : 0;
+        _pageController.animateToPage(
+          _currentPage,
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeInOutCubic,
+        );
+      }
     });
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    _controller.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -839,6 +959,7 @@ class _VisitPerformanceShuffleCardState extends State<_VisitPerformanceShuffleCa
     final perf = widget.myPerf;
     return Container(
       width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1033,12 +1154,13 @@ class _VisitPerformanceShuffleCardState extends State<_VisitPerformanceShuffleCa
     final top = widget.topPerf;
     return Container(
       width: double.infinity,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           colors: [
-            CrmColors.foreground,
-            CrmColors.foreground.withValues(alpha: 0.9),
+            Color(0xFF2A2A2A),
+            Color(0xFF000000),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -1046,9 +1168,9 @@ class _VisitPerformanceShuffleCardState extends State<_VisitPerformanceShuffleCa
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: CrmColors.foreground.withValues(alpha: 0.3),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -1060,15 +1182,14 @@ class _VisitPerformanceShuffleCardState extends State<_VisitPerformanceShuffleCa
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.amber.withValues(alpha: 0.15),
+                  color: Colors.white24,
                   borderRadius: BorderRadius.circular(50),
-                  border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
                 ),
-                child: Row(
+                child: const Row(
                   children: [
-                    const Icon(Icons.star_rounded, size: 12, color: Colors.amber),
-                    const SizedBox(width: 4),
-                    const Text(
+                    Icon(Icons.workspace_premium_rounded, size: 12, color: Colors.amber),
+                    SizedBox(width: 4),
+                    Text(
                       'Top Performer',
                       style: TextStyle(
                         fontSize: 10,
@@ -1082,8 +1203,8 @@ class _VisitPerformanceShuffleCardState extends State<_VisitPerformanceShuffleCa
               ),
               const Spacer(),
               const Text(
-                'Leading this month',
-                style: TextStyle(fontSize: 13, color: Colors.white54),
+                'This month',
+                style: TextStyle(fontSize: 13, color: Colors.white70),
               ),
             ],
           ),
@@ -1199,55 +1320,19 @@ class _VisitPerformanceShuffleCardState extends State<_VisitPerformanceShuffleCa
     final myScore = widget.myPerf?.performance ?? 0;
     final topScore = widget.topPerf?.performance ?? 0;
 
-    return GestureDetector(
-      onTap: () {
-        _startTimer();
-        _toggleCard();
-      },
-      onHorizontalDragEnd: (details) {
-        if (details.primaryVelocity != null && details.primaryVelocity!.abs() > 100) {
+    return SizedBox(
+      height: 235,
+      child: PageView(
+        controller: _pageController,
+        clipBehavior: Clip.none,
+        onPageChanged: (idx) {
+          _currentPage = idx;
           _startTimer();
-          _toggleCard();
-        }
-      },
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) {
-          final curve = CurvedAnimation(parent: _controller, curve: Curves.easeInOutBack);
-          final slideOut = Tween<Offset>(begin: Offset.zero, end: const Offset(-0.2, 0)).evaluate(curve);
-          final slideIn = Tween<Offset>(begin: const Offset(0.2, 0), end: Offset.zero).evaluate(curve);
-          final scaleOut = Tween<double>(begin: 1.0, end: 0.95).evaluate(curve);
-          final scaleIn = Tween<double>(begin: 0.95, end: 1.0).evaluate(curve);
-
-          final progress = _controller.value;
-
-          return Stack(
-            children: [
-              if (_showingTop || progress > 0)
-                Transform.translate(
-                  offset: Offset((_showingTop ? slideIn.dx : slideOut.dx) * 200, 0),
-                  child: Transform.scale(
-                    scale: _showingTop ? scaleIn : scaleOut,
-                    child: Opacity(
-                      opacity: _showingTop ? progress : (1 - progress),
-                      child: _buildTopCard(topScore),
-                    ),
-                  ),
-                ),
-              if (!_showingTop || progress > 0)
-                Transform.translate(
-                  offset: Offset((!_showingTop ? slideIn.dx : slideOut.dx) * 200, 0),
-                  child: Transform.scale(
-                    scale: !_showingTop ? scaleIn : scaleOut,
-                    child: Opacity(
-                      opacity: !_showingTop ? progress : (1 - progress),
-                      child: _buildMyCard(myScore),
-                    ),
-                  ),
-                ),
-            ],
-          );
         },
+        children: [
+          _buildMyCard(myScore),
+          _buildTopCard(topScore),
+        ],
       ),
     );
   }
@@ -1262,6 +1347,7 @@ class _StatCard extends StatelessWidget {
     required this.icon,
     required this.iconColor,
     required this.bgColor,
+    this.onTap,
   });
 
   final String title;
@@ -1269,62 +1355,70 @@ class _StatCard extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
   final Color bgColor;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: bgColor,
-                borderRadius: BorderRadius.circular(14),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.grey.shade200),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.02),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
               ),
-              child: Icon(icon, size: 22, color: iconColor),
-            ),
-            Column(
+            ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  count.toString(),
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: CrmColors.foreground,
-                    height: 1.1,
-                    letterSpacing: -1,
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: bgColor,
+                    borderRadius: BorderRadius.circular(14),
                   ),
+                  child: Icon(icon, size: 22, color: iconColor),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: CrmColors.mutedForeground,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.2,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      count.toString(),
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                        color: CrmColors.foreground,
+                        height: 1.1,
+                        letterSpacing: -1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: CrmColors.mutedForeground,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );

@@ -93,6 +93,7 @@ class LatestFirstMeeting {
 
 class MeetingQueueLead {
   final String id;
+  final String? clientId;
   final String name;
   final String? phone;
   final String? location;
@@ -113,6 +114,7 @@ class MeetingQueueLead {
 
   MeetingQueueLead({
     required this.id,
+    this.clientId,
     required this.name,
     this.phone,
     this.location,
@@ -132,9 +134,20 @@ class MeetingQueueLead {
     this.queueCategory,
   });
 
+  String? get displayClientId {
+    final cid = clientId;
+    if (cid != null && cid.trim().isNotEmpty) {
+      final trimmed = cid.trim();
+      return trimmed.startsWith('#') ? trimmed : '#$trimmed';
+    }
+    return null;
+  }
+
   factory MeetingQueueLead.fromJson(Map<String, dynamic> json) {
+    final rawClientId = json['clientId'] ?? json['client_id'];
     return MeetingQueueLead(
       id: json['id'] ?? '',
+      clientId: rawClientId != null ? rawClientId.toString() : null,
       name: json['name'] ?? '',
       phone: json['phone'],
       location: json['location'],

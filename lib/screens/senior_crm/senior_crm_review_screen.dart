@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:skeletonizer/skeletonizer.dart';
+import '../../config/app_config.dart';
 import '../../widgets/mobile_app_header.dart';
 import '../../theme/crm_colors.dart';
 import '../../models/review_submission.dart';
@@ -64,7 +65,7 @@ class _SeniorCrmReviewScreenState extends State<SeniorCrmReviewScreen> {
     });
 
     try {
-      final url = Uri.parse('https://www.aestheticinteriorbd.com/api/cad-work/review-center?limit=50');
+      final url = Uri.parse('${AppConfig.apiBaseUrl}/api/cad-work/review-center?limit=50');
       final token = await _getToken();
       
       final response = await http.get(
@@ -99,7 +100,7 @@ class _SeniorCrmReviewScreenState extends State<SeniorCrmReviewScreen> {
     try {
       showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
       
-      final url = Uri.parse('https://www.aestheticinteriorbd.com/api/cad-work/review-center/$submissionId/decision');
+      final url = Uri.parse('${AppConfig.apiBaseUrl}/api/cad-work/review-center/$submissionId/decision');
       final token = await _getToken();
       
       final response = await http.post(

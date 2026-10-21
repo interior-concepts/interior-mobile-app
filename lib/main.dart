@@ -8,6 +8,7 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'screens/clerk_auth_screen.dart';
 import 'screens/root_screen.dart';
 import 'services/fcm_service.dart';
+import 'services/notification_manager.dart';
 import 'theme/crm_theme.dart';
 
 void main() async {
@@ -18,6 +19,9 @@ void main() async {
 
   // Initialize FCM and register background handler.
   await FcmService.initialize();
+
+  // Initialize NotificationManager for in-app and polling notifications.
+  await NotificationManager.instance.initLocalNotifications();
 
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
@@ -35,8 +39,10 @@ void main() async {
 class CrmMobileApp extends StatelessWidget {
   const CrmMobileApp({super.key});
 
-  static const _clerkPublishableKey =
-      'pk_test_a25vd24tcGFuZ29saW4tOTUuY2xlcmsuYWNjb3VudHMuZGV2JA';
+  static const _clerkPublishableKey = String.fromEnvironment(
+    'CLERK_PUBLISHABLE_KEY',
+    defaultValue: 'pk_test_dGlkeS10YWhyLTQ0MDAuY2xlcmsuYWNjb3VudHMuZGV2JA',
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +54,7 @@ class CrmMobileApp extends StatelessWidget {
       ),
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        title: 'Aesthetic OMS',
+        title: 'Interior Concepts OMS',
         theme: CrmTheme.light(),
         builder: (context, child) {
           return AnnotatedRegion<SystemUiOverlayStyle>(

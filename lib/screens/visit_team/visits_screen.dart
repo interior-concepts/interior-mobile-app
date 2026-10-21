@@ -1,15 +1,18 @@
-import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 
 import '../../data/visits/visit.dart';
 import '../../data/visits/visit_api_service.dart';
 import '../../data/user/user_api_service.dart';
 import '../../widgets/mobile_app_header.dart';
+import '../../widgets/visit_card_widget.dart';
 import '../../theme/crm_colors.dart';
 
 class VisitsScreen extends StatefulWidget {
@@ -125,6 +128,9 @@ class _VisitsScreenState extends State<VisitsScreen> {
     return base.where((v) {
       return v.clientName.toLowerCase().contains(_searchQuery) ||
           v.location.toLowerCase().contains(_searchQuery) ||
+          (v.displayClientId?.toLowerCase().contains(_searchQuery) ?? false) ||
+          (v.clientId?.toLowerCase().contains(_searchQuery) ?? false) ||
+          (v.leadId?.toLowerCase().contains(_searchQuery) ?? false) ||
           (v.assignedTo?.fullName?.toLowerCase().contains(_searchQuery) ?? false);
     }).toList();
   }
@@ -370,7 +376,7 @@ class _VisitsScreenState extends State<VisitsScreen> {
                 )
               else
                 for (var i = 0; i < filteredVisits.length; i++) ...[
-                  _VisitCard(
+                  VisitCardWidget(
                     visit: filteredVisits[i],
                     currentUserId: _currentUserId,
                     onTap: () => _showVisitActionMenu(filteredVisits[i]),
@@ -401,7 +407,7 @@ class _VisitsScreenState extends State<VisitsScreen> {
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        builder: (ctx) => _SupportMemberSheet(visit: visit),
+        builder: (ctx) => SupportMemberSheet(visit: visit),
       );
       return;
     }
@@ -410,30 +416,35 @@ class _VisitsScreenState extends State<VisitsScreen> {
       context: context,
       showDragHandle: true,
       builder: (ctx) {
+        final isCompletedOrCancelled = visit.status == VisitStatus.completed ||
+            visit.status == VisitStatus.cancelled;
         return SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ListTile(
-                leading: const Icon(Icons.check_circle_outline),
-                title: const Text('Complete'),
-                onTap: () => Navigator.of(ctx).pop('complete'),
-              ),
+              if (!isCompletedOrCancelled)
+                ListTile(
+                  leading: const Icon(Icons.check_circle_outline),
+                  title: const Text('Complete'),
+                  onTap: () => Navigator.of(ctx).pop('complete'),
+                ),
               ListTile(
                 leading: const Icon(Icons.person_add_alt_1_outlined),
                 title: const Text('Add Support Members'),
                 onTap: () => Navigator.of(ctx).pop('add_support'),
               ),
-              ListTile(
-                leading: const Icon(Icons.event_repeat_outlined),
-                title: const Text('Reschedule'),
-                onTap: () => Navigator.of(ctx).pop('reschedule'),
-              ),
-              ListTile(
-                leading: const Icon(Icons.cancel_outlined),
-                title: const Text('Cancel'),
-                onTap: () => Navigator.of(ctx).pop('cancel'),
-              ),
+              if (!isCompletedOrCancelled)
+                ListTile(
+                  leading: const Icon(Icons.event_repeat_outlined),
+                  title: const Text('Reschedule'),
+                  onTap: () => Navigator.of(ctx).pop('reschedule'),
+                ),
+              if (!isCompletedOrCancelled)
+                ListTile(
+                  leading: const Icon(Icons.cancel_outlined),
+                  title: const Text('Cancel'),
+                  onTap: () => Navigator.of(ctx).pop('cancel'),
+                ),
             ],
           ),
         );
@@ -659,22 +670,12 @@ class _VisitsScreenState extends State<VisitsScreen> {
 
   Future<_VisitResultPayload?> _showCompleteVisitResultSheet() async {
     final summaryCtrl = TextEditingController();
-    final clientMoodCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
-    final clientPotentialityCtrl = TextEditingController();
-    final projectTypeCtrl = TextEditingController();
-    final clientPersonalityCtrl = TextEditingController();
-    final budgetRangeCtrl = TextEditingController();
-    final timelineUrgencyCtrl = TextEditingController();
-    final stylePreferenceCtrl = TextEditingController();
-    final supportClientNameCtrl = TextEditingController();
-    final supportProjectAreaCtrl = TextEditingController();
-    final supportExtraConcernCtrl = TextEditingController();
     final attachedFiles = <String>[];
+    String? clientMood;
+    String? clientPersonality;
 
-    String resultType = 'LEAD';
     String? projectStatus;
-    String? supportProjectStatus;
     int step = 0;
     String? potentiality;
     String? projectType;
@@ -689,7 +690,6 @@ class _VisitsScreenState extends State<VisitsScreen> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setModalState) {
-            final isSupport = resultType == 'SUPPORT';
             return SafeArea(
               child: Padding(
                 padding: EdgeInsets.only(
@@ -707,24 +707,11 @@ class _VisitsScreenState extends State<VisitsScreen> {
                         'Complete Visit',
                         style: Theme.of(ctx).textTheme.titleMedium,
                       ),
-                      const SizedBox(height: 10),
-                      if (!isSupport) Text('Step ${step + 1} of 3'),
-                      const SizedBox(height: 8),
-                      SegmentedButton<String>(
-                        segments: const [
-                          ButtonSegment(value: 'LEAD', label: Text('Lead')),
-                          ButtonSegment(value: 'SUPPORT', label: Text('Support')),
-                        ],
-                        selected: {resultType},
-                        onSelectionChanged: (s) {
-                          setModalState(() {
-                            resultType = s.first;
-                            step = 0; // reset step on switch
-                          });
-                        },
-                      ),
+                      const SizedBox(height: 6),
+                      Text('Step ${step + 1} of 3'),
                       const SizedBox(height: 12),
-                      if (!isSupport && step == 0) ...[
+                      // ── Step 1: Summary ───────────────────────────────
+                      if (step == 0) ...[
                         TextField(
                           controller: summaryCtrl,
                           maxLines: 3,
@@ -734,16 +721,24 @@ class _VisitsScreenState extends State<VisitsScreen> {
                           ),
                         ),
                         const SizedBox(height: 10),
-                        TextField(
-                          controller: clientMoodCtrl,
+                        DropdownButtonFormField<String>(
+                          value: clientMood,
                           decoration: const InputDecoration(
-                            labelText: 'Client mood',
+                            labelText: 'Client Mood',
                             border: OutlineInputBorder(),
                           ),
+                          items: const [
+                            DropdownMenuItem(value: 'HAPPY', child: Text('Happy')),
+                            DropdownMenuItem(value: 'NEUTRAL', child: Text('Neutral')),
+                            DropdownMenuItem(value: 'EXCITED', child: Text('Excited')),
+                            DropdownMenuItem(value: 'CONCERNED', child: Text('Concerned')),
+                            DropdownMenuItem(value: 'UNHAPPY', child: Text('Unhappy')),
+                          ],
+                          onChanged: (v) => setModalState(() => clientMood = v),
                         ),
                         const SizedBox(height: 10),
                         DropdownButtonFormField<String>(
-                          initialValue: projectStatus,
+                          value: projectStatus,
                           decoration: const InputDecoration(
                             labelText: 'Select project status',
                             border: OutlineInputBorder(),
@@ -751,9 +746,9 @@ class _VisitsScreenState extends State<VisitsScreen> {
                           items: const [
                             DropdownMenuItem(
                               value: 'UNDER_CONSTRUCTION',
-                              child: Text('UNDER_CONSTRUCTION'),
+                              child: Text('Under Construction'),
                             ),
-                            DropdownMenuItem(value: 'READY', child: Text('READY')),
+                            DropdownMenuItem(value: 'READY', child: Text('Ready')),
                           ],
                           onChanged: (v) => setModalState(() => projectStatus = v),
                         ),
@@ -767,7 +762,8 @@ class _VisitsScreenState extends State<VisitsScreen> {
                           ),
                         ),
                       ],
-                      if (!isSupport && step == 1) ...[
+                      // ── Step 2: Lead Details ──────────────────────────
+                      if (step == 1) ...[
                         DropdownButtonFormField<String>(
                           initialValue: potentiality,
                           decoration: const InputDecoration(
@@ -783,7 +779,7 @@ class _VisitsScreenState extends State<VisitsScreen> {
                         ),
                         const SizedBox(height: 10),
                         DropdownButtonFormField<String>(
-                          initialValue: projectType,
+                          value: projectType,
                           decoration: const InputDecoration(
                             labelText: 'Type',
                             border: OutlineInputBorder(),
@@ -793,16 +789,25 @@ class _VisitsScreenState extends State<VisitsScreen> {
                             DropdownMenuItem(value: 'APARTMENT', child: Text('Apartment')),
                             DropdownMenuItem(value: 'VILLA', child: Text('Villa')),
                             DropdownMenuItem(value: 'OFFICE', child: Text('Office')),
+                            DropdownMenuItem(value: 'COMMERCIAL', child: Text('Commercial')),
+                            DropdownMenuItem(value: 'RESIDENTIAL', child: Text('Residential')),
                           ],
                           onChanged: (v) => setModalState(() => projectType = v),
                         ),
                         const SizedBox(height: 10),
-                        TextField(
-                          controller: clientPersonalityCtrl,
+                        DropdownButtonFormField<String>(
+                          value: clientPersonality,
                           decoration: const InputDecoration(
-                            labelText: 'Personality',
+                            labelText: 'Client Personality',
                             border: OutlineInputBorder(),
                           ),
+                          items: const [
+                            DropdownMenuItem(value: 'ANALYTICAL', child: Text('Analytical')),
+                            DropdownMenuItem(value: 'DRIVER', child: Text('Driver')),
+                            DropdownMenuItem(value: 'EXPRESSIVE', child: Text('Expressive')),
+                            DropdownMenuItem(value: 'AMIABLE', child: Text('Amiable')),
+                          ],
+                          onChanged: (v) => setModalState(() => clientPersonality = v),
                         ),
                         const SizedBox(height: 10),
                         DropdownButtonFormField<String>(
@@ -860,97 +865,22 @@ class _VisitsScreenState extends State<VisitsScreen> {
                           onChanged: (v) => setModalState(() => stylePreference = v),
                         ),
                       ],
-                      if (isSupport) ...[
+                      // ── Step 3: Attachments ───────────────────────────
+                      if (step == 2) ...[
                         Text(
-                          'Support Fields',
+                          'Attachments & Photos',
                           style: Theme.of(ctx).textTheme.titleSmall,
                         ),
                         const SizedBox(height: 10),
-                        TextField(
-                          controller: supportClientNameCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Support Client Name *',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: supportProjectAreaCtrl,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
-                          ),
-                          decoration: const InputDecoration(
-                            labelText: 'Support Project Area (Sqft) *',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        DropdownButtonFormField<String>(
-                          initialValue: supportProjectStatus,
-                          decoration: const InputDecoration(
-                            labelText: 'Support Project Status *',
-                            border: OutlineInputBorder(),
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'UNDER_CONSTRUCTION',
-                              child: Text('UNDER_CONSTRUCTION'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'READY',
-                              child: Text('READY'),
-                            ),
-                          ],
-                          onChanged: (v) => setModalState(
-                            () => supportProjectStatus = v,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        TextField(
-                          controller: supportExtraConcernCtrl,
-                          decoration: const InputDecoration(
-                            labelText: 'Support Extra Concern',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-                      ],
-                      if ((!isSupport && step == 2) || isSupport) ...[
-                        Text(
-                          'Attachments',
-                          style: Theme.of(ctx).textTheme.titleSmall,
-                        ),
-                        const SizedBox(height: 10),
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            final picked = await FilePicker.platform.pickFiles(
-                              allowMultiple: true,
-                              type: FileType.any,
-                            );
-                            if (picked == null) return;
-                            setModalState(() {
-                              attachedFiles.addAll(
-                                picked.paths.whereType<String>(),
-                              );
-                            });
-                          },
-                          icon: const Icon(Icons.attach_file),
-                          label: const Text('Attach Files'),
+                        _AttachmentPicker(
+                          attachedFiles: attachedFiles,
+                          setModalState: setModalState,
                         ),
                         const SizedBox(height: 8),
-                        if (attachedFiles.isEmpty)
-                          const Text('No files attached yet.')
-                        else
-                          ...attachedFiles.map(
-                            (f) => ListTile(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              title: Text(
-                                f.split('/').last,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
+                        _AttachedFileList(
+                          attachedFiles: attachedFiles,
+                          setModalState: setModalState,
+                        ),
                       ],
                       const SizedBox(height: 14),
                       Row(
@@ -958,92 +888,55 @@ class _VisitsScreenState extends State<VisitsScreen> {
                           Expanded(
                             child: OutlinedButton(
                               onPressed: () {
-                                if (!isSupport && step > 0) {
+                                if (step > 0) {
                                   setModalState(() => step -= 1);
                                   return;
                                 }
                                 Navigator.of(ctx).pop();
                               },
-                              child: Text((!isSupport && step > 0) ? 'Back' : 'Cancel'),
+                              child: Text(step > 0 ? 'Back' : 'Cancel'),
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
                             child: FilledButton(
                               onPressed: () {
-                                if (!isSupport) {
-                                  if (step == 0) {
-                                    if (summaryCtrl.text.trim().isEmpty) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Summary is required')),
-                                      );
-                                      return;
-                                    }
-                                    setModalState(() => step = 1);
-                                    return;
-                                  }
-                                  if (step == 1) {
-                                    setModalState(() => step = 2);
-                                    return;
-                                  }
-                                }
-
-                                double? supportArea;
-                                if (isSupport &&
-                                    supportProjectAreaCtrl.text.trim().isNotEmpty) {
-                                  supportArea = double.tryParse(
-                                    supportProjectAreaCtrl.text.trim(),
-                                  );
-                                  if (supportArea == null) {
+                                if (step == 0) {
+                                  if (summaryCtrl.text.trim().isEmpty) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       const SnackBar(
-                                        content: Text(
-                                          'Support project area must be a valid number',
-                                        ),
-                                      ),
+                                          content: Text('Summary is required')),
                                     );
                                     return;
                                   }
-                                }
-
-                                if (isSupport &&
-                                    (supportClientNameCtrl.text.trim().isEmpty ||
-                                        supportArea == null ||
-                                        supportProjectStatus == null)) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Support client name, project area and status are required',
-                                      ),
-                                    ),
-                                  );
+                                  setModalState(() => step = 1);
                                   return;
                                 }
-
+                                if (step == 1) {
+                                  setModalState(() => step = 2);
+                                  return;
+                                }
+                                // step == 2 → submit
                                 Navigator.of(ctx).pop(
                                   _VisitResultPayload(
                                     submission: VisitResultSubmission(
                                       summary: summaryCtrl.text.trim(),
-                                      clientMood: clientMoodCtrl.text,
+                                      clientMood: clientMood,
                                       note: noteCtrl.text,
                                       projectStatus: projectStatus,
-                                      resultType: resultType,
-                                      clientPotentiality: potentiality ?? clientPotentialityCtrl.text,
-                                      projectType: projectType ?? projectTypeCtrl.text,
-                                      clientPersonality: clientPersonalityCtrl.text,
-                                      budgetRange: budgetRange ?? budgetRangeCtrl.text,
-                                      timelineUrgency: timelineUrgency ?? timelineUrgencyCtrl.text,
-                                      stylePreference: stylePreference ?? stylePreferenceCtrl.text,
-                                      supportClientName: supportClientNameCtrl.text,
-                                      supportProjectArea: supportArea,
-                                      supportProjectStatus: supportProjectStatus,
-                                      supportExtraConcern: supportExtraConcernCtrl.text,
+                                      resultType: 'LEAD',
+                                      clientPotentiality: potentiality,
+                                      projectType: projectType,
+                                      clientPersonality: clientPersonality,
+                                      budgetRange: budgetRange,
+                                      timelineUrgency: timelineUrgency,
+                                      stylePreference: stylePreference,
                                     ),
                                     filePaths: List<String>.from(attachedFiles),
                                   ),
                                 );
                               },
-                              child: Text((!isSupport && step < 2) ? 'Next' : 'Submit'),
+                              child: Text(step < 2 ? 'Next' : 'Submit'),
                             ),
                           ),
                         ],
@@ -1059,17 +952,7 @@ class _VisitsScreenState extends State<VisitsScreen> {
     );
 
     summaryCtrl.dispose();
-    clientMoodCtrl.dispose();
     noteCtrl.dispose();
-    clientPotentialityCtrl.dispose();
-    projectTypeCtrl.dispose();
-    clientPersonalityCtrl.dispose();
-    budgetRangeCtrl.dispose();
-    timelineUrgencyCtrl.dispose();
-    stylePreferenceCtrl.dispose();
-    supportClientNameCtrl.dispose();
-    supportProjectAreaCtrl.dispose();
-    supportExtraConcernCtrl.dispose();
 
     return result;
   }
@@ -1146,295 +1029,56 @@ class _MetricChip extends StatelessWidget {
   }
 }
 
-class _VisitCard extends StatefulWidget {
-  const _VisitCard({
-    required this.visit,
-    this.currentUserId,
-    this.onTap,
-    this.onLongPress,
+
+// ── Shared attachment helper widgets ────────────────────────────────────────
+
+/// A row with [Attach Files] + [Take Photo] buttons.
+/// Calls [setModalState] to trigger the bottom-sheet rebuild.
+class _AttachmentPicker extends StatelessWidget {
+  const _AttachmentPicker({
+    required this.attachedFiles,
+    required this.setModalState,
   });
 
-  final Visit visit;
-  final String? currentUserId;
-  final VoidCallback? onTap;
-  final VoidCallback? onLongPress;
-
-  @override
-  State<_VisitCard> createState() => _VisitCardState();
-}
-
-class _VisitCardState extends State<_VisitCard> {
-  bool _isExpanded = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final visit = widget.visit;
-    final currentUserId = widget.currentUserId;
-    final isSupportMember = currentUserId != null &&
-        visit.supportAssignments.any((a) => a.supportUserId == currentUserId) &&
-        visit.assignedToId != currentUserId;
-
-    final statusLabel = _statusLabel(visit.status);
-    final scheduledDate = _formatDateTime(visit.scheduledAt);
-    final assignedName = visit.assignedTo?.fullName ?? 'Unassigned';
-
-    Color statusFg;
-    Color statusBg;
-    Color statusBorder;
-    IconData statusIcon;
-
-    switch (visit.status) {
-      case VisitStatus.scheduled:
-        statusFg = CrmColors.brandPrimary;
-        statusBg = CrmColors.brandPrimary.withValues(alpha: 0.1);
-        statusBorder = CrmColors.brandPrimary.withValues(alpha: 0.2);
-        statusIcon = Icons.schedule_outlined;
-        break;
-      case VisitStatus.completed:
-        statusFg = const Color(0xFF2E7D32);
-        statusBg = const Color(0xFF2E7D32).withValues(alpha: 0.1);
-        statusBorder = const Color(0xFF2E7D32).withValues(alpha: 0.2);
-        statusIcon = Icons.check_circle_outline;
-        break;
-      case VisitStatus.rescheduled:
-        statusFg = const Color(0xFF1565C0);
-        statusBg = const Color(0xFF1565C0).withValues(alpha: 0.1);
-        statusBorder = const Color(0xFF1565C0).withValues(alpha: 0.2);
-        statusIcon = Icons.event_repeat_outlined;
-        break;
-      case VisitStatus.cancelled:
-        statusFg = CrmColors.error;
-        statusBg = CrmColors.error.withValues(alpha: 0.1);
-        statusBorder = CrmColors.error.withValues(alpha: 0.2);
-        statusIcon = Icons.cancel_outlined;
-        break;
-      default:
-        statusFg = CrmColors.mutedForeground;
-        statusBg = CrmColors.mutedForeground.withValues(alpha: 0.1);
-        statusBorder = CrmColors.mutedForeground.withValues(alpha: 0.2);
-        statusIcon = Icons.help_outline;
-    }
-
-    return GestureDetector(
-      onLongPress: widget.onLongPress,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: isSupportMember 
-                ? const Color(0xFFE0B0FF).withValues(alpha: 0.8) 
-                : Colors.grey.withValues(alpha: 0.2),
-            width: isSupportMember ? 1.5 : 1.0,
-          ),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: isSupportMember 
-              ? [
-                  const Color(0xFFFDFBFF),
-                  const Color(0xFFF3E5F5).withValues(alpha: 0.6),
-                ]
-              : [
-                  Colors.white,
-                  const Color(0xFFF8F9FE),
-                ],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: isSupportMember 
-                  ? const Color(0xFFE0B0FF).withValues(alpha: 0.2) 
-                  : Colors.black.withValues(alpha: 0.06),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(24),
-          child: InkWell(
-            onTap: () {
-              setState(() {
-                _isExpanded = !_isExpanded;
-              });
-            },
-            onLongPress: widget.onLongPress,
-            borderRadius: BorderRadius.circular(24),
-            splashColor: CrmColors.brandPrimary.withValues(alpha: 0.05),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (isSupportMember)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 6.0, top: 2.0),
-                          child: Icon(Icons.people_alt, size: 16, color: const Color(0xFF8E24AA)),
-                        ),
-                      Expanded(
-                        child: Text(
-                          visit.clientName,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: CrmColors.foreground,
-                            letterSpacing: -0.2,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: statusBg,
-                          borderRadius: BorderRadius.circular(50),
-                          border: Border.all(color: statusBorder),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(statusIcon, size: 12, color: statusFg),
-                            const SizedBox(width: 4),
-                            Text(
-                              statusLabel.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                color: statusFg,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  _CardRow(
-                    iconBg: Colors.white,
-                    iconColor: CrmColors.brandPrimary.withValues(alpha: 0.6),
-                    icon: Icons.calendar_today_outlined,
-                    text: scheduledDate,
-                    shadowColor: Colors.black.withValues(alpha: 0.05),
-                    bold: true,
-                  ),
-
-                  if (_isExpanded) ...[
-                    const SizedBox(height: 8),
-                    _CardRow(
-                      iconBg: Colors.white,
-                      iconColor: CrmColors.brandPrimary.withValues(alpha: 0.6),
-                      icon: Icons.location_on_outlined,
-                      text: visit.location,
-                      shadowColor: Colors.black.withValues(alpha: 0.05),
-                    ),
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.only(top: 12),
-                      decoration: BoxDecoration(
-                        border: Border(
-                          top: BorderSide(
-                            color: Colors.grey.withValues(alpha: 0.2),
-                          ),
-                        ),
-                      ),
-                      child: _CardRow(
-                        iconBg: CrmColors.brandPrimary.withValues(alpha: 0.05),
-                        iconColor: CrmColors.brandPrimary,
-                        icon: Icons.person_outline_rounded,
-                        text: 'Assigned to: $assignedName',
-                        shadowColor: Colors.transparent,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  Center(
-                    child: Icon(
-                      _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                      color: Colors.grey.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  String _statusLabel(VisitStatus status) {
-    switch (status) {
-      case VisitStatus.scheduled:
-        return 'Pending';
-      case VisitStatus.completed:
-        return 'Completed';
-      case VisitStatus.rescheduled:
-        return 'Rescheduled';
-      case VisitStatus.cancelled:
-        return 'Cancelled';
-      case VisitStatus.unknown:
-        return 'Unknown';
-    }
-  }
-
-  String _formatDateTime(DateTime? dateTime) {
-    if (dateTime == null) return 'Date unavailable';
-
-    final local = dateTime.toLocal();
-    final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-    ];
-    final month = months[local.month - 1];
-    final day = local.day;
-    final hour = local.hour % 12 == 0 ? 12 : local.hour % 12;
-    final minute = local.minute.toString().padLeft(2, '0');
-    final amPm = local.hour >= 12 ? 'PM' : 'AM';
-
-    return '$month $day • $hour:$minute $amPm';
-  }
-}
-
-class _CardRow extends StatelessWidget {
-  const _CardRow({
-    required this.iconBg,
-    required this.iconColor,
-    required this.icon,
-    required this.text,
-    required this.shadowColor,
-    this.bold = false,
-  });
-
-  final Color iconBg;
-  final Color iconColor;
-  final IconData icon;
-  final String text;
-  final Color shadowColor;
-  final bool bold;
+  final List<String> attachedFiles;
+  final StateSetter setModalState;
 
   @override
   Widget build(BuildContext context) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Icon(icon, size: 16, color: iconColor),
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () async {
+              final picked = await FilePicker.platform.pickFiles(
+                allowMultiple: true,
+                type: FileType.any,
+              );
+              if (picked == null) return;
+              setModalState(() {
+                attachedFiles.addAll(picked.paths.whereType<String>());
+              });
+            },
+            icon: const Icon(Icons.attach_file),
+            label: const Text('Attach Files'),
+          ),
+        ),
         const SizedBox(width: 8),
         Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: 13,
-              color: CrmColors.mutedForeground,
-              height: 1.4,
-              fontWeight: bold ? FontWeight.w600 : FontWeight.w400,
+          child: FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF16A34A),
             ),
+            onPressed: () async {
+              final picker = ImagePicker();
+              final image = await picker.pickImage(source: ImageSource.camera);
+              if (image == null) return;
+              setModalState(() {
+                attachedFiles.add(image.path);
+              });
+            },
+            icon: const Icon(Icons.camera_alt),
+            label: const Text('Take Photo'),
           ),
         ),
       ],
@@ -1442,94 +1086,91 @@ class _CardRow extends StatelessWidget {
   }
 }
 
-// ─── Support Member Sheet ─────────────────────────────────────────────────────
+/// Shows the list of attached files with image thumbnails and remove buttons.
+class _AttachedFileList extends StatelessWidget {
+  const _AttachedFileList({
+    required this.attachedFiles,
+    required this.setModalState,
+  });
 
-class _SupportMemberSheet extends StatelessWidget {
-  const _SupportMemberSheet({required this.visit});
-  final Visit visit;
+  final List<String> attachedFiles;
+  final StateSetter setModalState;
 
   @override
   Widget build(BuildContext context) {
-    final assignedName =
-        visit.assignedTo?.fullName ?? visit.assignedTo?.email ?? 'the assigned member';
+    if (attachedFiles.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.attach_file, size: 16, color: Colors.grey),
+            SizedBox(width: 8),
+            Text('No files attached yet.',
+                style: TextStyle(color: Colors.grey)),
+          ],
+        ),
+      );
+    }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF6C47FF).withValues(alpha: 0.08),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.shield_outlined,
-              size: 40,
-              color: Color(0xFF6C47FF),
-            ),
+    return Column(
+      children: attachedFiles.map((f) {
+        final lower = f.toLowerCase();
+        final isImage = lower.endsWith('.jpg') ||
+            lower.endsWith('.jpeg') ||
+            lower.endsWith('.png') ||
+            lower.endsWith('.webp');
+        return Container(
+          margin: const EdgeInsets.only(bottom: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: CrmColors.brandPrimary.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+                color: CrmColors.brandPrimary.withValues(alpha: 0.2)),
           ),
-          const SizedBox(height: 16),
-          const Text(
-            'Support Member',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: CrmColors.foreground,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'You are a support member on this visit. Only $assignedName (the assigned member) can take actions.',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 14,
-              color: CrmColors.mutedForeground,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: 20),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8F8FC),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.person_outline_rounded, size: 18, color: CrmColors.mutedForeground),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Assigned to: $assignedName',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: CrmColors.foreground,
+          child: Row(
+            children: [
+              if (isImage)
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.file(
+                    File(f),
+                    width: 40,
+                    height: 40,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.photo_camera_rounded,
+                      color: CrmColors.brandPrimary,
+                      size: 30,
                     ),
                   ),
+                )
+              else
+                const Icon(Icons.insert_drive_file,
+                    color: CrmColors.brandPrimary),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  f.split('/').last,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w500),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF6C47FF),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               ),
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.w700)),
-            ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 18, color: Colors.red),
+                onPressed: () =>
+                    setModalState(() => attachedFiles.remove(f)),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      }).toList(),
     );
   }
 }

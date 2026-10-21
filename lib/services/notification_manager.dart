@@ -64,6 +64,7 @@ class NotificationManager extends ChangeNotifier {
     _tokenRefresher = tokenRefresher;
     _seenIds.clear();
     _isFirstFetch = true;
+    initLocalNotifications();
     _fetchNow();
     _pollingTimer?.cancel();
     _pollingTimer = Timer.periodic(const Duration(seconds: 30), (_) {

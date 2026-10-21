@@ -3,6 +3,7 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 
 import '../theme/crm_colors.dart';
 import '../theme/crm_theme.dart';
+import '../widgets/block_building_background.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -86,65 +87,42 @@ class _LoginScreenState extends State<LoginScreen> {
     final isDesktopWidth = size.width >= 900;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              'assets/images/checkbackground.jpg',
-              fit: BoxFit.cover,
-              color: Colors.black.withValues(alpha: 0.12),
-              colorBlendMode: BlendMode.darken,
-            ),
-          ),
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.white.withValues(alpha: 0.84),
-                    Colors.white.withValues(alpha: 0.90),
-                  ],
-                ),
+      backgroundColor: const Color(0xFFFAFAFA),
+      body: BlockBuildingBackground(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 18,
+                vertical: 20,
               ),
-            ),
-          ),
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 20,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: isDesktopWidth ? 940 : 460,
                 ),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: isDesktopWidth ? 940 : 460,
-                  ),
-                  child: Card(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: isDesktopWidth ? 28 : 18,
-                        vertical: isDesktopWidth ? 30 : 20,
-                      ),
-                      child: isDesktopWidth
-                          ? Row(
-                              children: [
-                                Expanded(child: _InfoPanel(theme: theme)),
-                                const SizedBox(width: 26),
-                                Expanded(
-                                  child: _buildForm(theme, compact: false),
-                                ),
-                              ],
-                            )
-                          : _buildForm(theme, compact: true),
+                child: Card(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isDesktopWidth ? 28 : 18,
+                      vertical: isDesktopWidth ? 30 : 20,
                     ),
+                    child: isDesktopWidth
+                        ? Row(
+                            children: [
+                              Expanded(child: _InfoPanel(theme: theme)),
+                              const SizedBox(width: 26),
+                              Expanded(
+                                child: _buildForm(theme, compact: false),
+                              ),
+                            ],
+                          )
+                        : _buildForm(theme, compact: true),
                   ),
                 ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -252,6 +230,7 @@ class _MobileHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
+        /*
         Container(
           width: 44,
           height: 44,
@@ -261,16 +240,23 @@ class _MobileHeader extends StatelessWidget {
             borderRadius: BorderRadius.circular(CrmTheme.radiusMd),
             border: Border.all(color: CrmColors.border),
           ),
-          child: Image.asset('assets/ais-icon-dark.png'),
+          child: Image.asset('assets/interior-concept-icon-dark.png'),
         ),
         const SizedBox(width: 10),
+        */
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('AESTHETIC INTERIOR', style: theme.textTheme.labelSmall),
-              const SizedBox(height: 2),
-              Text('Sign In', style: theme.textTheme.titleMedium),
+              Text(
+                'INTERIOR CONCEPTS STUDIO', 
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text('Sign In', style: theme.textTheme.bodyMedium?.copyWith(color: CrmColors.mutedForeground)),
             ],
           ),
         ),
@@ -291,6 +277,7 @@ class _InfoPanel extends StatelessWidget {
       children: [
         Row(
           children: [
+            /*
             Container(
               width: 52,
               height: 52,
@@ -300,18 +287,25 @@ class _InfoPanel extends StatelessWidget {
                 borderRadius: BorderRadius.circular(CrmTheme.radiusMd),
                 border: Border.all(color: CrmColors.border),
               ),
-              child: Image.asset('assets/ais-icon-dark.png'),
+              child: Image.asset('assets/interior-concept-icon-dark.png'),
             ),
             const SizedBox(width: 12),
+            */
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('AESTHETIC INTERIOR', style: theme.textTheme.labelSmall),
-                  const SizedBox(height: 2),
+                  Text(
+                    'INTERIOR CONCEPTS STUDIO', 
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
                   Text(
                     'Operations Management Software',
-                    style: theme.textTheme.titleMedium?.copyWith(fontSize: 20),
+                    style: theme.textTheme.bodyMedium?.copyWith(color: CrmColors.mutedForeground),
                   ),
                 ],
               ),

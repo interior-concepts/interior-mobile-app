@@ -123,6 +123,17 @@ class _MeetingQueueCardState extends State<MeetingQueueCard> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
+                          if (widget.lead.displayClientId != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              'Client ID: ${widget.lead.displayClientId}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.indigo.shade700,
+                              ),
+                            ),
+                          ],
                           if (widget.lead.phone != null) ...[
                             const SizedBox(height: 4),
                             Text(

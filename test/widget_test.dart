@@ -7,6 +7,6 @@ void main() {
     await tester.pumpWidget(const CrmMobileApp());
 
     expect(find.text('Sign In'), findsAtLeastNWidgets(1));
-    expect(find.text('AESTHETIC INTERIOR'), findsOneWidget);
+    expect(find.text('INTERIOR CONCEPTS STUDIO'), findsOneWidget);
   });
 }

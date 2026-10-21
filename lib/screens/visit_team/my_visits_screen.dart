@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../data/visits/visit.dart';
 import '../../data/visits/visit_api_service.dart';
@@ -256,8 +257,28 @@ class _SimpleVisitCard extends StatelessWidget {
   final Visit visit;
   final Future<void> Function(String action)? onAction;
 
+  Future<void> _makePhoneCall(BuildContext context, String phone) async {
+    final cleanPhone = phone.replaceAll(RegExp(r'[^\d+]'), '');
+    if (cleanPhone.isEmpty) return;
+    final uri = Uri(scheme: 'tel', path: cleanPhone);
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri);
+      } else {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error launching call: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final phone = visit.clientPhone;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ExpansionTile(
@@ -275,15 +296,41 @@ class _SimpleVisitCard extends StatelessWidget {
               onSelected: (value) {
                 onAction?.call(value);
               },
-              itemBuilder: (ctx) => [
-                const PopupMenuItem(value: 'complete', child: Text('Complete')),
-                const PopupMenuItem(value: 'reschedule', child: Text('Reschedule')),
-                const PopupMenuItem(value: 'cancel', child: Text('Cancel')),
-              ],
+              itemBuilder: (ctx) {
+                final isCompletedOrCancelled = visit.status == VisitStatus.completed ||
+                    visit.status == VisitStatus.cancelled;
+                if (isCompletedOrCancelled) {
+                  return [];
+                }
+                return const [
+                  PopupMenuItem(value: 'complete', child: Text('Complete')),
+                  PopupMenuItem(value: 'reschedule', child: Text('Reschedule')),
+                  PopupMenuItem(value: 'cancel', child: Text('Cancel')),
+                ];
+              },
             ),
           ],
         ),
         children: [
+          if (phone != null && phone.isNotEmpty) ...[
+            InkWell(
+              onTap: () => _makePhoneCall(context, phone),
+              child: Row(
+                children: [
+                  const Icon(Icons.phone_outlined, size: 16, color: Color(0xFF16A34A)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      phone,
+                      style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF16A34A)),
+                    ),
+                  ),
+                  const Icon(Icons.call, size: 16, color: Color(0xFF16A34A)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           Row(
             children: [
               const Icon(Icons.location_on_outlined, size: 16, color: Colors.grey),

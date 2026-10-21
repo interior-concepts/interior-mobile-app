@@ -42,6 +42,10 @@ class _RootScreenState extends State<RootScreen> {
         if (mounted) setState(() => _isLoading = false);
         return;
       }
+
+      // Always register FCM device token for authenticated user immediately
+      FcmService.registerToken(token);
+
       final user = await UserApiService().fetchMe(token);
       if (!mounted) return;
       setState(() {
@@ -64,9 +68,6 @@ class _RootScreenState extends State<RootScreen> {
             }
           },
         );
-        // Register FCM token so backend can send push notifications
-        // when the app is in the background or killed.
-        FcmService.registerToken(token);
       }
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);

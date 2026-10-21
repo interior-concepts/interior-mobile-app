@@ -19,6 +19,7 @@ class Visit {
   const Visit({
     required this.id,
     required this.leadId,
+    this.clientId,
     required this.clientName,
     required this.location,
     required this.scheduledAt,
@@ -41,14 +42,21 @@ class Visit {
   });
 
   factory Visit.fromJson(Map<String, dynamic> json) {
-    final leadJson = json['lead'] as Map<String, dynamic>?;
+    final leadJson = (json['lead'] ?? json['client'] ?? json['leadData']) as Map<String, dynamic>?;
     final scheduledAtRaw = json['scheduledAt'] as String?;
     final locationValue = (json['location'] as String?)?.trim();
     final leadName = (leadJson?['name'] as String?)?.trim();
+    final rawClientId = json['clientId'] ??
+        leadJson?['clientId'] ??
+        json['client_id'] ??
+        leadJson?['client_id'] ??
+        json['leadClientId'] ??
+        leadJson?['leadClientId'];
 
     return Visit(
       id: json['id'] as String? ?? '',
       leadId: json['leadId'] as String?,
+      clientId: rawClientId != null ? rawClientId.toString() : null,
       clientName: (leadName?.isNotEmpty ?? false)
           ? leadName!
           : ((locationValue?.isNotEmpty ?? false) ? locationValue! : 'Client'),
@@ -92,6 +100,7 @@ class Visit {
 
   final String id;
   final String? leadId;
+  final String? clientId;
   final String clientName;
   final String location;
   final DateTime? scheduledAt;
@@ -120,17 +129,37 @@ class Visit {
         local.month == day.month &&
         local.day == day.day;
   }
+
+  String? get clientPhone {
+    final p = lead?.phone?.trim();
+    if (p != null && p.isNotEmpty) return p;
+    return null;
+  }
+
+  String? get displayClientId {
+    final cid = clientId ?? lead?.clientId;
+    if (cid != null && cid.trim().isNotEmpty) {
+      final trimmed = cid.trim();
+      return trimmed.startsWith('#') ? trimmed : '#$trimmed';
+    }
+    return null;
+  }
 }
 
 class VisitLead {
-  const VisitLead({this.id, this.name, this.phone, this.location});
-  factory VisitLead.fromJson(Map<String, dynamic> json) => VisitLead(
-    id: json['id'] as String?,
-    name: json['name'] as String?,
-    phone: json['phone'] as String?,
-    location: json['location'] as String?,
-  );
+  const VisitLead({this.id, this.clientId, this.name, this.phone, this.location});
+  factory VisitLead.fromJson(Map<String, dynamic> json) {
+    final rawClientId = json['clientId'] ?? json['client_id'] ?? json['leadClientId'];
+    return VisitLead(
+      id: json['id'] as String?,
+      clientId: rawClientId != null ? rawClientId.toString() : null,
+      name: json['name'] as String?,
+      phone: (json['phone'] as String?) ?? (json['phoneNumber'] as String?) ?? (json['mobile'] as String?),
+      location: json['location'] as String?,
+    );
+  }
   final String? id;
+  final String? clientId;
   final String? name;
   final String? phone;
   final String? location;
@@ -263,6 +292,7 @@ class VisitResult {
     this.clientMood,
     this.clientPotentiality,
     this.projectType,
+    this.projectStatus,
     this.clientPersonality,
     this.budgetRange,
     this.timelineUrgency,
@@ -278,6 +308,7 @@ class VisitResult {
     clientMood: json['clientMood'] as String?,
     clientPotentiality: json['clientPotentiality'] as String?,
     projectType: json['projectType'] as String?,
+    projectStatus: json['projectStatus'] as String?,
     clientPersonality: json['clientPersonality'] as String?,
     budgetRange: json['budgetRange'] as String?,
     timelineUrgency: json['timelineUrgency'] as String?,
@@ -292,6 +323,7 @@ class VisitResult {
   final String? clientMood;
   final String? clientPotentiality;
   final String? projectType;
+  final String? projectStatus;
   final String? clientPersonality;
   final String? budgetRange;
   final String? timelineUrgency;

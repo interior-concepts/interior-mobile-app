@@ -64,6 +64,7 @@ class FcmService {
   static final _messaging = FirebaseMessaging.instance;
   static final _localPlugin = FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
+  static String? latestToken;
 
   static Future<void> initialize() async {
     if (_initialized) return;
@@ -73,6 +74,14 @@ class FcmService {
 
     // Request permission (iOS + Android 13+).
     await _messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
+    );
+
+    // Enable foreground notification presentation options
+    await _messaging.setForegroundNotificationPresentationOptions(
       alert: true,
       badge: true,
       sound: true,
@@ -121,6 +130,15 @@ class FcmService {
       NotificationManager.instance.forceFetch();
     });
 
+    try {
+      final initialToken = await _messaging.getToken();
+      if (initialToken != null) {
+        debugPrint('🔔 [FCM] App Launch FCM Token: $initialToken');
+      }
+    } catch (e) {
+      debugPrint('🔔 [FCM] Could not fetch initial FCM token on boot: $e');
+    }
+
     _initialized = true;
   }
 
@@ -164,7 +182,12 @@ class FcmService {
         return;
       }
 
-      debugPrint('🔔 [FCM] Got FCM token (first 40 chars): ${fcmToken.substring(0, fcmToken.length.clamp(0, 40))}...');
+      latestToken = fcmToken;
+
+      debugPrint('🔔 [FCM] ===================================================');
+      debugPrint('🔔 [FCM] FULL FCM TOKEN FOR TESTING:');
+      debugPrint('$fcmToken');
+      debugPrint('🔔 [FCM] ===================================================');
 
       final uri = Uri.parse(AppConfig.apiBaseUrl).resolve('/api/device-tokens');
       debugPrint('🔔 [FCM] Registering token at: $uri');

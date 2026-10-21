@@ -7,6 +7,7 @@ class VisitResult {
     this.clientMood,
     this.clientPotentiality,
     this.projectType,
+    this.projectStatus,
     this.clientPersonality,
     this.budgetRange,
     this.timelineUrgency,
@@ -21,6 +22,7 @@ class VisitResult {
   final String? clientMood;
   final String? clientPotentiality;
   final String? projectType;
+  final String? projectStatus;
   final String? clientPersonality;
   final String? budgetRange;
   final String? timelineUrgency;
@@ -37,6 +39,7 @@ class VisitResult {
         clientMood: json['clientMood'] as String?,
         clientPotentiality: json['clientPotentiality'] as String?,
         projectType: json['projectType'] as String?,
+        projectStatus: json['projectStatus'] as String?,
         clientPersonality: json['clientPersonality'] as String?,
         budgetRange: json['budgetRange'] as String?,
         timelineUrgency: json['timelineUrgency'] as String?,
@@ -52,6 +55,7 @@ class VisitResult {
         if (clientMood != null) 'clientMood': clientMood,
         if (clientPotentiality != null) 'clientPotentiality': clientPotentiality,
         if (projectType != null) 'projectType': projectType,
+        if (projectStatus != null) 'projectStatus': projectStatus,
         if (clientPersonality != null) 'clientPersonality': clientPersonality,
         if (budgetRange != null) 'budgetRange': budgetRange,
         if (timelineUrgency != null) 'timelineUrgency': timelineUrgency,

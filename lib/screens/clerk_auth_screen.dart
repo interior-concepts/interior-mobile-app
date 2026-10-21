@@ -5,6 +5,8 @@ import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:wave/wave.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 
+import '../widgets/block_building_background.dart';
+
 class ClerkAuthenticationScreen extends StatefulWidget {
   const ClerkAuthenticationScreen({
     super.key,
@@ -31,22 +33,22 @@ class _ClerkDynamicBackground extends Color {
         stack.contains('RichText')) {
       return 0xFFFFFFFF; // White for button text/icon
     }
-    return 0x00000000; // Transparent background to show background image
+    return 0x00000000; // Transparent background to show background animation
   }
 }
 
 class _ClerkAuthenticationScreenState extends State<ClerkAuthenticationScreen> {
   bool _showClerkBox = false;
 
-  late final ClerkThemeColors _customClerkDarkColors = ClerkThemeColors(
+  late final ClerkThemeColors _customClerkLightColors = ClerkThemeColors(
     background: const _ClerkDynamicBackground(),
-    altBackground: Colors.white.withOpacity(0.08),
-    borderSide: Colors.white.withOpacity(0.15),
-    text: Colors.white,
-    icon: Colors.white,
-    lightweightText: Colors.white.withOpacity(0.6),
-    error: const Color(0xFFff3333),
-    accent: const Color(0xFF6c47ff),
+    altBackground: Colors.white.withValues(alpha: 0.35),
+    borderSide: const Color(0xFF0284C7).withValues(alpha: 0.25),
+    text: const Color(0xFF0F172A),
+    icon: const Color(0xFF0F172A),
+    lightweightText: const Color(0xFF475569),
+    error: const Color(0xFFEF4444),
+    accent: const Color(0xFF0284C7),
   );
 
   @override
@@ -66,85 +68,85 @@ class _ClerkAuthenticationScreenState extends State<ClerkAuthenticationScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Background Image
-          Positioned.fill(
-            child: Image.asset(
-              'assets/mobileBanner3.jpeg',
-              fit: BoxFit.cover,
-            ),
-          ),
-          // Very light dark overlay so background image is clearly visible
-          Positioned.fill(
-            child: Container(
-              color: Colors.black.withOpacity(0.15),
-            ),
-          ),
-          
-          // Foreground Content
-          SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // App Logo (clean and without round circle/border)
-                      Image.asset(
-                        'assets/ais-icon-dark.png',
-                        width: 72,
-                        height: 72,
-                        fit: BoxFit.contain,
+      backgroundColor: const Color(0xFFFAFAFA),
+      body: BlockBuildingBackground(
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // App Logo (Commented out)
+                    /*
+                    Image.asset(
+                      'assets/interior-concept-icon-dark.png',
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(height: 18),
+                    */
+                    
+                    // Prominent Company Brand Name (High-Contrast Charcoal/Navy)
+                    const Text(
+                      'INTERIOR CONCEPTS STUDIO',
+                      style: TextStyle(
+                        fontSize: 26, 
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF0F172A),
+                        letterSpacing: 2.0,
+                        height: 1.25,
+                        shadows: [
+                          Shadow(
+                            color: Color(0x330284C7),
+                            blurRadius: 16,
+                          ),
+                          Shadow(
+                            color: Color(0x266366F1),
+                            blurRadius: 32,
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      
-                      const Text(
-                        'Welcome Back',
-                        style: TextStyle(
-                          fontSize: 32, 
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                        textAlign: TextAlign.center,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Welcome Back',
+                      style: TextStyle(
+                        fontSize: 16, 
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF475569),
+                        letterSpacing: 0.5,
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Aesthetic Interior Management System',
-                        style: TextStyle(
-                          fontSize: 16, 
-                          color: Colors.white.withValues(alpha: 0.8),
-                          fontWeight: FontWeight.w500,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 40),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 36),
                       
                       // Render ClerkAuthentication or the Signed-in block directly
                       SizedBox(
                         width: double.infinity,
                         child: widget.isSignedIn
-                            ? Container(
+                              ? Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
                                 decoration: BoxDecoration(
-                                  color: Colors.transparent,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: Colors.white.withOpacity(0.15), width: 0.5),
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3), width: 1.0),
                                 ),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.check_circle_outline, color: Colors.greenAccent, size: 64),
+                                    const Icon(Icons.check_circle_outline, color: Color(0xFF10B981), size: 64),
                                     const SizedBox(height: 24),
-                                    const Text('You are signed in.', style: TextStyle(fontSize: 16, color: Colors.white70)),
+                                    const Text('You are signed in.', style: TextStyle(fontSize: 16, color: Color(0xFF0F172A), fontWeight: FontWeight.bold)),
                                     const SizedBox(height: 24),
                                     ElevatedButton(
                                       style: ElevatedButton.styleFrom(
                                         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                                        backgroundColor: Colors.white,
-                                        foregroundColor: Colors.black87,
+                                        backgroundColor: const Color(0xFF0284C7),
+                                        foregroundColor: Colors.white,
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                                       ),
                                       onPressed: widget.onContinue,
@@ -155,7 +157,7 @@ class _ClerkAuthenticationScreenState extends State<ClerkAuthenticationScreen> {
                                       onPressed: () {
                                         ClerkAuth.of(context, listen: false).signOut();
                                       },
-                                      child: const Text('Sign Out', style: TextStyle(color: Colors.redAccent)),
+                                      child: const Text('Sign Out', style: TextStyle(color: Color(0xFFEF4444))),
                                     )
                                   ],
                                 ),
@@ -163,24 +165,38 @@ class _ClerkAuthenticationScreenState extends State<ClerkAuthenticationScreen> {
                             : Stack(
                                 alignment: Alignment.center,
                                 children: [
-                                  // The actual Clerk Authentication widget, loading invisibly first
+                                  // The actual Clerk Authentication widget with transparent background
                                   AnimatedOpacity(
                                     duration: const Duration(milliseconds: 600),
                                     opacity: _showClerkBox ? 1.0 : 0.0,
                                     child: IgnorePointer(
                                       ignoring: !_showClerkBox,
-                                      child: Theme(
-                                        data: ThemeData.dark().copyWith(
-                                          extensions: [
-                                            ClerkThemeExtension(colors: _customClerkDarkColors),
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.50),
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.30), width: 1.0),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withValues(alpha: 0.05),
+                                              blurRadius: 20,
+                                              offset: const Offset(0, 8),
+                                            ),
                                           ],
                                         ),
-                                        child: const ClerkAuthentication(),
+                                        child: Theme(
+                                          data: ThemeData.light().copyWith(
+                                            extensions: [
+                                              ClerkThemeExtension(colors: _customClerkLightColors),
+                                            ],
+                                          ),
+                                          child: const ClerkAuthentication(),
+                                        ),
                                       ),
                                     ),
                                   ),
                                   
-                                  // The loading spinner, visible while checking for auto-login
+                                  // The loading spinner
                                   if (!_showClerkBox)
                                     Padding(
                                       padding: const EdgeInsets.symmetric(vertical: 40.0),
@@ -188,16 +204,16 @@ class _ClerkAuthenticationScreenState extends State<ClerkAuthenticationScreen> {
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           const SpinKitFoldingCube(
-                                            color: Colors.white,
+                                            color: Color(0xFF0284C7),
                                             size: 35.0,
                                           ),
                                           const SizedBox(height: 24),
-                                          Text(
+                                          const Text(
                                             'Preparing your dashboard...',
                                             style: TextStyle(
-                                              color: Colors.white.withValues(alpha: 0.8),
+                                              color: Color(0xFF475569),
                                               fontSize: 14,
-                                              fontWeight: FontWeight.w500,
+                                              fontWeight: FontWeight.w600,
                                             ),
                                           ),
                                         ],
@@ -213,8 +229,7 @@ class _ClerkAuthenticationScreenState extends State<ClerkAuthenticationScreen> {
               ),
             ),
           ),
-        ],
-      ),
-    );
+        ),
+      );
   }
 }

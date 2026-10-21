@@ -4,7 +4,7 @@ class AppConfig {
   // Deployment base URL (no path). Endpoint is appended in API services.
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://www.aestheticinteriorbd.com',
+    defaultValue: 'https://www.interiorconceptspremium.com',
   );
 
   static const String apiAuthToken = String.fromEnvironment(

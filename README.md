@@ -1,7 +1,7 @@
-# Aesthetic-interior-mobile-application ( android , ios ) 
+# Interior-concepts-mobile-application ( android , ios ) 
 
 
-Flutter mobile app for Aesthetic CRM.
+Flutter mobile app for Interior Concepts CRM.
 
 ## Visits API Connection
 

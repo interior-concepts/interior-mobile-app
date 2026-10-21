@@ -27,23 +27,32 @@ class _SeniorCrmHomeScreenState extends State<SeniorCrmHomeScreen> {
       const SeniorCrmProfileScreen(),
     ];
 
-    return Scaffold(
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        transitionBuilder: (child, animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.02, 0),
-                end: Offset.zero,
-              ).animate(animation),
-              child: child,
-            ),
-          );
-        },
-        child: screens[_currentIndex],
-      ),
+    final safeIndex = _currentIndex.clamp(0, screens.length - 1);
+
+    return PopScope(
+      canPop: safeIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && safeIndex != 0) {
+          setState(() => _currentIndex = 0);
+        }
+      },
+      child: Scaffold(
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          transitionBuilder: (child, animation) {
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.02, 0),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              ),
+            );
+          },
+          child: screens[safeIndex],
+        ),
       bottomNavigationBar: ClipRRect(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -117,6 +126,7 @@ class _SeniorCrmHomeScreenState extends State<SeniorCrmHomeScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 }

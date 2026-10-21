@@ -6,6 +6,7 @@ import 'package:wave/wave.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 
 import '../widgets/block_building_background.dart';
+import '../services/user_session_manager.dart';
 
 class ClerkAuthenticationScreen extends StatefulWidget {
   const ClerkAuthenticationScreen({
@@ -54,9 +55,8 @@ class _ClerkAuthenticationScreenState extends State<ClerkAuthenticationScreen> {
   @override
   void initState() {
     super.initState();
-    // Allow 3.5 seconds for Clerk to silently restore any active cookie session in the background
-    // before we fade in the login form to the user.
-    Timer(const Duration(milliseconds: 3500), () {
+    // Smooth fade in for Clerk login form
+    Timer(const Duration(milliseconds: 400), () {
       if (mounted) {
         setState(() {
           _showClerkBox = true;
@@ -154,8 +154,11 @@ class _ClerkAuthenticationScreenState extends State<ClerkAuthenticationScreen> {
                                     ),
                                     const SizedBox(height: 16),
                                     TextButton(
-                                      onPressed: () {
-                                        ClerkAuth.of(context, listen: false).signOut();
+                                      onPressed: () async {
+                                        await UserSessionManager.clearUser();
+                                        if (context.mounted) {
+                                          ClerkAuth.of(context, listen: false).signOut();
+                                        }
                                       },
                                       child: const Text('Sign Out', style: TextStyle(color: Color(0xFFEF4444))),
                                     )

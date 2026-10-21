@@ -9,6 +9,7 @@ import 'screens/clerk_auth_screen.dart';
 import 'screens/root_screen.dart';
 import 'services/fcm_service.dart';
 import 'services/notification_manager.dart';
+import 'services/user_session_manager.dart';
 import 'theme/crm_theme.dart';
 
 void main() async {
@@ -259,40 +260,18 @@ class _AuthBootSplash extends StatelessWidget {
   }
 }
 
-class AppRoot extends StatefulWidget {
+class AppRoot extends StatelessWidget {
   const AppRoot({super.key});
-
-  @override
-  State<AppRoot> createState() => _AppRootState();
-}
-
-class _AppRootState extends State<AppRoot> {
-  bool _didContinue = false;
 
   @override
   Widget build(BuildContext context) {
     return ClerkAuthBuilder(
       signedInBuilder: (context, authState) {
-        if (_didContinue) {
-          return const RootScreen();
-        } else {
-          return ClerkAuthenticationScreen(
-            isSignedIn: true,
-            onContinue: () {
-              setState(() {
-                _didContinue = true;
-              });
-            },
-          );
-        }
+        // Ensure Clerk Client object is persisted for seamless background & app resumes
+        UserSessionManager.setupAutoPersist(authState);
+        return const RootScreen();
       },
       signedOutBuilder: (context, authState) {
-        // Reset state so next time they login they see the button again
-        if (_didContinue) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _didContinue = false);
-          });
-        }
         return const ClerkAuthenticationScreen(isSignedIn: false);
       },
     );

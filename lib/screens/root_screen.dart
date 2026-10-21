@@ -3,6 +3,7 @@ import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 
 import '../data/user/user_api_service.dart';
+import '../services/user_session_manager.dart';
 import '../theme/crm_colors.dart';
 import 'visit_team/visit_team_home_screen.dart';
 import 'senior_crm/senior_crm_home_screen.dart';
@@ -20,6 +21,7 @@ class _RootScreenState extends State<RootScreen> {
   bool _isLoading = true;
   bool _isSeniorCrm = false;
   bool _isVisitTeam = false;
+  bool _isNetworkError = false;
 
   @override
   void initState() {
@@ -34,12 +36,32 @@ class _RootScreenState extends State<RootScreen> {
   }
 
   Future<void> _checkUserRole() async {
+    // 1. Immediately restore cached role if available, so user lands in app instantly
+    final cachedUser = await UserSessionManager.getCachedUser();
+    if (cachedUser != null && mounted) {
+      setState(() {
+        _isSeniorCrm = cachedUser.isSeniorCrm;
+        _isVisitTeam = cachedUser.isVisitTeam;
+        _isLoading = false;
+        _isNetworkError = false;
+      });
+    }
+
     try {
       final authState = ClerkAuth.of(context, listen: false);
+
+      // Keep Clerk client persistent so mobile never logs out on background exit
+      UserSessionManager.persistClerkClient(authState);
+
       final sessionToken = await authState.sessionToken();
       final token = sessionToken.jwt;
       if (token.isEmpty) {
-        if (mounted) setState(() => _isLoading = false);
+        if (cachedUser == null && mounted) {
+          setState(() {
+            _isLoading = false;
+            _isNetworkError = true;
+          });
+        }
         return;
       }
 
@@ -48,29 +70,50 @@ class _RootScreenState extends State<RootScreen> {
 
       final user = await UserApiService().fetchMe(token);
       if (!mounted) return;
-      setState(() {
-        _isSeniorCrm = user?.isSeniorCrm ?? false;
-        _isVisitTeam = user?.isVisitTeam ?? false;
-        _isLoading = false;
-      });
 
-      if (_isSeniorCrm || _isVisitTeam) {
-        // Start polling for in-app badge updates.
-        // Pass a tokenRefresher so every API call uses a fresh JWT (Clerk JWTs expire ~60s).
-        NotificationManager.instance.startPolling(
-          token,
-          tokenRefresher: () async {
-            try {
-              final freshSession = await authState.sessionToken();
-              return freshSession.jwt.isNotEmpty ? freshSession.jwt : null;
-            } catch (_) {
-              return null;
-            }
-          },
-        );
+      if (user != null) {
+        // Cache user for persistent offline & background resumes
+        await UserSessionManager.saveUser(user);
+
+        setState(() {
+          _isSeniorCrm = user.isSeniorCrm;
+          _isVisitTeam = user.isVisitTeam;
+          _isLoading = false;
+          _isNetworkError = false;
+        });
+
+        if (user.isSeniorCrm || user.isVisitTeam) {
+          // Start polling for in-app badge updates.
+          // Pass a tokenRefresher so every API call uses a fresh JWT (Clerk JWTs expire ~60s).
+          NotificationManager.instance.startPolling(
+            token,
+            tokenRefresher: () async {
+              try {
+                final freshSession = await authState.sessionToken();
+                return freshSession.jwt.isNotEmpty ? freshSession.jwt : null;
+              } catch (_) {
+                return null;
+              }
+            },
+          );
+        }
+      } else {
+        // fetchMe returned null (e.g. network timeout or server glitch)
+        if (cachedUser == null && mounted) {
+          setState(() {
+            _isLoading = false;
+            _isNetworkError = true;
+          });
+        }
       }
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
+    } catch (e) {
+      debugPrint('⚠️ [RootScreen] Error checking user role: $e');
+      if (cachedUser == null && mounted) {
+        setState(() {
+          _isLoading = false;
+          _isNetworkError = true;
+        });
+      }
     }
   }
 
@@ -90,6 +133,52 @@ class _RootScreenState extends State<RootScreen> {
 
     if (_isVisitTeam) {
       return const VisitTeamHomeScreen();
+    }
+
+    if (_isNetworkError) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.wifi_off_rounded, size: 64, color: CrmColors.brandPrimary),
+                const SizedBox(height: 20),
+                const Text(
+                  'Connection Problem',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Unable to reach the server. Please check your internet connection and try again.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: CrmColors.mutedForeground, height: 1.4),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: CrmColors.brandPrimary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _isLoading = true;
+                      _isNetworkError = false;
+                    });
+                    _checkUserRole();
+                  },
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Try Again'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     // If they have neither department, block entry.
@@ -118,8 +207,11 @@ class _RootScreenState extends State<RootScreen> {
             ),
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () {
-                ClerkAuth.of(context, listen: false).signOut();
+              onPressed: () async {
+                await UserSessionManager.clearUser();
+                if (context.mounted) {
+                  ClerkAuth.of(context, listen: false).signOut();
+                }
               },
               child: const Text('Sign Out'),
             ),

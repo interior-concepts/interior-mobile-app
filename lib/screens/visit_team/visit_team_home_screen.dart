@@ -5,6 +5,7 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:fui_kit/fui_kit.dart';
 
 import '../../data/user/user_api_service.dart';
+import '../../services/user_session_manager.dart';
 import '../../theme/crm_colors.dart';
 import 'dashboard_screen.dart';
 import 'visits_screen.dart';
@@ -31,6 +32,17 @@ class _VisitTeamHomeScreenState extends State<VisitTeamHomeScreen> {
   }
 
   Future<void> _fetchUserRole() async {
+    // 1. Immediately check cached user role to avoid blocking spinner
+    final cached = await UserSessionManager.getCachedUser();
+    if (cached != null && mounted) {
+      final isLeader = cached.isVisitTeamLeader;
+      setState(() {
+        _isLeader = isLeader;
+        _roleChecked = true;
+        if (isLeader && _currentIndex == 0) _currentIndex = 3;
+      });
+    }
+
     try {
       final authState = ClerkAuth.of(context, listen: false);
       final sessionToken = await authState.sessionToken();
@@ -41,13 +53,18 @@ class _VisitTeamHomeScreenState extends State<VisitTeamHomeScreen> {
       }
       final user = await UserApiService().fetchMe(token);
       if (!mounted) return;
-      final isLeader = user?.isVisitTeamLeader ?? false;
-      setState(() {
-        _isLeader = isLeader;
-        _roleChecked = true;
-        // Land leaders directly on the Control tab (index 3)
-        if (isLeader) _currentIndex = 3;
-      });
+      if (user != null) {
+        await UserSessionManager.saveUser(user);
+        final isLeader = user.isVisitTeamLeader;
+        setState(() {
+          _isLeader = isLeader;
+          _roleChecked = true;
+          // Land leaders directly on the Control tab (index 3) on initial load
+          if (isLeader && _currentIndex == 0) _currentIndex = 3;
+        });
+      } else {
+        if (mounted) setState(() => _roleChecked = true);
+      }
     } catch (_) {
       if (mounted) setState(() => _roleChecked = true);
     }
@@ -74,7 +91,14 @@ class _VisitTeamHomeScreenState extends State<VisitTeamHomeScreen> {
 
     final safeIndex = _currentIndex.clamp(0, screens.length - 1);
 
-    return Scaffold(
+    return PopScope(
+      canPop: safeIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && safeIndex != 0) {
+          setState(() => _currentIndex = 0);
+        }
+      },
+      child: Scaffold(
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
         transitionBuilder: (child, animation) {
@@ -171,6 +195,7 @@ class _VisitTeamHomeScreenState extends State<VisitTeamHomeScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 }

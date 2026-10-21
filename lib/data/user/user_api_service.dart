@@ -54,6 +54,10 @@ class CurrentUser {
           rolesList.add(item['role']['name'] as String);
         }
       }
+    } else if (json['roles'] is List) {
+      for (final item in json['roles']) {
+        if (item is String) rolesList.add(item);
+      }
     }
 
     final depsList = <String>[];
@@ -62,6 +66,10 @@ class CurrentUser {
         if (item['department'] is Map && item['department']['name'] is String) {
           depsList.add(item['department']['name'] as String);
         }
+      }
+    } else if (json['departments'] is List) {
+      for (final item in json['departments']) {
+        if (item is String) depsList.add(item);
       }
     }
 
@@ -73,6 +81,14 @@ class CurrentUser {
       departments: depsList,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'fullName': fullName,
+        'email': email,
+        'roles': roles,
+        'departments': departments,
+      };
 }
 
 class UserApiService {
